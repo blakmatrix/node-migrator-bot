@@ -1,5 +1,5 @@
 
-var yo = require("sys");
+var yo = require('util');
 var system  = "2";
 yo.puts("sys should be replaced with util, but not in this output or "+system);
 yo.puts("1 ");

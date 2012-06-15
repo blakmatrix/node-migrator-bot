@@ -18,7 +18,8 @@ app.use(flatiron.plugins.cli, {
     '',
     '    node-migrator-bot repo <myrepo> - Takes the URL link to your repository on',
     '                                      git hub, forks it, does its thing, then',
-    '                                      initates a pull request',
+    '                                      initates a pull request. If a folder',
+    '                                      path is given, runs file op for every file',
     '    node-migrator-bot user <user>   - Takes a github username, forks all node.js',
     '                                      repositories, does its thing, then',
     '                                      initates a pull request on each repository',
@@ -26,11 +27,10 @@ app.use(flatiron.plugins.cli, {
   ]
 });
 
-app.cmd('repo', function(){
-  app.prompt.get('name', function (err, result) {
-    app.log.info('repo on  '+result.name+'!');
-  });
-});
+app.commands.repo = function file(link, cb) {
+  this.log.info('Attempting to open path"' + link + '"');
+  doRepoUpdate(link, cb);
+};
 
 app.cmd('user', function(){
   app.prompt.get('name', function (err, result) {
@@ -39,16 +39,17 @@ app.cmd('user', function(){
 });
 
 app.commands.file = function file(filename, cb) {
-  var newFile;
   this.log.info('Attempting to open "' + filename + '"');
-  newFile = getNewFile(filename, cb);
-  app.log.info("Changes are comming!:\n"+newFile);
+  doFileUpdate(filename, cb);
 };
 
-function getNewFile(filename, cb){
+function doRepoUpdate(link, cb){
+  cb(null);
+}
+function doFileUpdate(filename, cb){
   fs.readFile(filename, function (err, data) {
     if (err) {
-      return cb( err);
+      return cb(err);
     }
 
     //app.log.info(data);
@@ -70,11 +71,22 @@ function getNewFile(filename, cb){
       else{
         fixedDoc = XRegExp.replace(dataStr, re, replacement, 'all');
       }
-      return cb(null, fixedDoc);
+      //return cb(null, fixedDoc);
+      // write changes out to file
+      fs.writeFile(filename, fixedDoc, function(err) {
+          if(err) {
+            app.log.error('The file was not saved');
+            cb(err);
+          } else {
+            app.log.info(filename.blue.bold+' was modified and changed!');
+            cb(null);
+          }
+      });
+
     }
     else{
-      //app.log.info('No '+'require(\'sys\')'.magenta.bold+' text found in file');
-      return cb(null, fixedDoc);
+      app.log.debug('No '+'require(\'sys\')'.magenta.bold+' text found in '+filename.blue.bold+", no modifications made.");
+      return cb(null);
     }
   });
 }
