@@ -41,16 +41,14 @@ app.cmd('user', function(){
 app.commands.file = function file(filename, cb) {
   var newFile;
   this.log.info('Attempting to open "' + filename + '"');
-  newFile = new getNewFile(filename, cb);
-  app.log.info("Changes are comming!:\n");
-  console.log(newFile);
-  cb(null);
+  newFile = getNewFile(filename, cb);
+  app.log.info("Changes are comming!:\n"+newFile);
 };
 
 function getNewFile(filename, cb){
   fs.readFile(filename, function (err, data) {
     if (err) {
-      cb( err);
+      return cb( err);
     }
 
     //app.log.info(data);
@@ -63,25 +61,23 @@ function getNewFile(filename, cb){
         replacementFull = "util = require('util')",
         replacementPart = 'util.',
         dataStr = data.toString();
-        dataMod = '';
+        fixedDoc = '';
 
     if (XRegExp.test(dataStr, re)) {
       if (XRegExp.test(dataStr, reFull)) {
-        dataMod = XRegExp.replace(XRegExp.replace(dataStr, rePart, replacementPart, 'all'), reFull, replacementFull, 'all');
+        fixedDoc = XRegExp.replace(XRegExp.replace(dataStr, rePart, replacementPart, 'all'), reFull, replacementFull, 'all');
       }
       else{
-        dataMod = XRegExp.replace(dataStr, re, replacement, 'all');
+        fixedDoc = XRegExp.replace(dataStr, re, replacement, 'all');
       }
-      //do stuff to dataMod
-      //app.log.info(dataMod);
-      return dataMod;
+      return cb(null, fixedDoc);
     }
     else{
       //app.log.info('No '+'require(\'sys\')'.magenta.bold+' text found in file');
-      return null;
+      return cb(null, fixedDoc);
     }
   });
-};
+}
 
 app.start( function (err){
   if (err) {
