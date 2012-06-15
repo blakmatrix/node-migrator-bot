@@ -1,0 +1,21 @@
+{
+  "description": "A bot that performs node migrations on github repositories",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "flatiron": "0.2.1",
+    "winston": "~0.6.1",
+    "xregexp": "~2.0.0"
+  },
+  "devDependencies": {
+    "cli-easy": "0.1.0",
+    "vows": "0.6.1"
+  },
+  "scripts": {
+    "test": "vows --spec",
+    "start": "node app.js"
+  },
+  "name": "node-migrator-bot",
+  "author": "Farrin A. Reid",
+  "homepage": ""
+}
