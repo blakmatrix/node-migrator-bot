@@ -2,6 +2,7 @@ var flatiron = require('flatiron'),
     path     = require('path'),
     XRegExp  = require('xregexp').XRegExp,
     fs       = require('fs'),
+    path     = require('path'),
     app      = flatiron.app;
 
 
@@ -44,8 +45,50 @@ app.commands.file = function file(filename, cb) {
 };
 
 function doRepoUpdate(link, cb){
-  cb(null);
+  re = /(http|ftp|https|git|file):\/\/(\/)?[\w-]+(\.[\w-]+)+([\w.,@?\^=%&amp;:\/~+#-]*[\w@?\^=%&amp;\/~+#-])?/gi;
+  if (XRegExp.test(link, re)) {
+    app.log.info(link.blue.bold+' is a url');
+  }else{
+    app.log.info(link.blue.bold+' is a folder');
+    walk(link, function(err, results) {
+      if (err) {
+        return cb(err);
+      }
+      var index;
+      for (index in results){
+        doFileUpdate(results[index],cb);
+      }
+    });
+  }
 }
+
+function walk(dir, done) {
+  var results = [];
+  fs.readdir(dir, function(err, list) {
+    if (err) return done(err);
+    var index = list.indexOf('.git');//remove git
+    if(index >= 0){
+      list.splice(index, 1);
+    }
+    var pending = list.length;
+    if (!pending) return done(null, results);
+    list.forEach(function(file) {
+      file = path.resolve(path.join(dir,file));
+      fs.stat(file, function(err, stat) {
+        if (stat && stat.isDirectory()) {
+          walk(file, function(err, res) {
+            results = results.concat(res);
+            if (!--pending) done(null, results);
+          });
+        } else {
+          results.push(file);
+          if (!--pending) done(null, results);
+        }
+      });
+    });
+  });
+}
+
 function doFileUpdate(filename, cb){
   fs.readFile(filename, function (err, data) {
     if (err) {
@@ -86,7 +129,7 @@ function doFileUpdate(filename, cb){
     }
     else{
       app.log.debug('No '+'require(\'sys\')'.magenta.bold+' text found in '+filename.blue.bold+", no modifications made.");
-      return cb(null);
+      cb(null);
     }
   });
 }
