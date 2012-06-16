@@ -3,6 +3,7 @@ var flatiron = require('flatiron'),
     XRegExp  = require('xregexp').XRegExp,
     fs       = require('fs'),
     path     = require('path'),
+    async    = require('async'),
     app      = flatiron.app;
 
 
@@ -54,14 +55,15 @@ function doRepoUpdate(link, cb){
       if (err) {
         return cb(err);
       }
-      var index;
-      for (index in results){
-        doFileUpdate(results[index],cb);
-      }
+
+      async.forEach(results, doFileUpdate ,cb);
+
     });
   }
 }
+function fork(link, cb){
 
+}
 function walk(dir, done) {
   var results = [];
   fs.readdir(dir, function(err, list) {
