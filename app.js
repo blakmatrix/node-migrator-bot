@@ -4,6 +4,8 @@ var flatiron = require('flatiron'),
     fs       = require('fs'),
     path     = require('path'),
     async    = require('async'),
+    request  = require('request'),
+    github   = require('octonode'),
     app      = flatiron.app;
 
 
@@ -46,9 +48,28 @@ app.commands.file = function file(filename, cb) {
 };
 
 function doRepoUpdate(link, cb){
-  re = /(http|ftp|https|git|file):\/\/(\/)?[\w-]+(\.[\w-]+)+([\w.,@?\^=%&amp;:\/~+#-]*[\w@?\^=%&amp;\/~+#-])?/gi;
+  var re = /(http|ftp|https|git|file):\/\/(\/)?[\w-]+(\.[\w-]+)+([\w.,@?\^=%&amp;:\/~+#-]*[\w@?\^=%&amp;\/~+#-])?/gi;
+  var user;
+  var repo;
+  var parse;
   if (XRegExp.test(link, re)) {
     app.log.info(link.blue.bold+' is a url');
+    parse = XRegExp(/.*github.com\/(.*)\/(.*?)(\.git$|$)/g);
+    user = XRegExp.replace(link, parse, '$1');
+    repo = XRegExp.replace(link, parse, '$2');
+    var client = github.client({
+      username: 'CHANGEME',
+      password: 'CHANGE_ME'
+    });
+
+    //client.get('/user', function (err, status, body) {
+      //app.log.info(  body.toString() ); //json object
+      //console.dir(body);
+    //});
+
+    app.log.info('Forking '+user.magenta.bold+'/'+repo.yellow.bold);
+    client.me().fork(user+'/'+repo, cb);
+
   }else{
     app.log.info(link.blue.bold+' is a folder');
     walk(link, function(err, results) {
@@ -61,7 +82,7 @@ function doRepoUpdate(link, cb){
     });
   }
 }
-function fork(link, cb){
+function forkAndFix(link, cb){
 
 }
 function walk(dir, done) {
