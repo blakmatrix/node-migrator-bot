@@ -8,8 +8,8 @@ var flatiron = require('flatiron'),
     github   = require('octonode'),
     util     = require('util'),
     exec     = require('child_process').exec,
-    username = 'XXXXXXXXXX',
-    password = 'XXXXXXXXXX',
+    username = 'XXXXXXXXXXX',
+    password = 'XXXXXXXXXXX',
     app      = flatiron.app;
 
 
@@ -63,7 +63,6 @@ function doRepoUpdate(link, cb){
   }
 }
 function forkAndFix(link, cb){
-  
   var parse    = XRegExp(/.*github.com\/(.*)\/(.*?)(\.git$|$)/g);
   var user     = XRegExp.replace(link, parse, '$1');
   var repo     = XRegExp.replace(link, parse, '$2');
@@ -82,11 +81,19 @@ function forkAndFix(link, cb){
     function(forkedRepo, repoLocation, callback){
       cloneRepo(forkedRepo, repoLocation, callback);
     },// clone repo
+    function(forkedRepo, repoLocation, callback){
+      switchBranch(forkedRepo, repoLocation, callback);
+    },// switch branch
     function(repoLocation, callback){
-      walkAndFix(repoLocation, callback);
-    }//,// walkAndFix -- need to change link to proper diectory
-    // push
-    // pull
+      walkAndFix(repoLocation, callback);//? lose all variables?
+    },// walkAndFix
+    function(callback){
+      commitRepo(forkedRepo, repoLocation, callback);
+    },// commit
+    function(callback){
+      pushCommit(forkedRepo, repoLocation, callback);
+    }// push
+    // submit pull request
     ],
     function(err, results){//callback
       if (err) {
@@ -116,17 +123,78 @@ function forkRepo( forkedRepo, username, user, repo, repoLocation, cb){
 function cloneRepo(forkedRepo, repoLocation, cb){
   app.log.info("Attempting to clone "+ forkedRepo.blue.bold);
   var cmd = 'git clone '+forkedRepo+' "'+repoLocation+'"';
-  app.log.debug('calling: "'+cmd+'"');
+  app.log.debug('calling: "'+cmd.grey+'"');
   var child = exec(cmd,
     function (error, stdout, stderr) {
-      //app.log.debug('stdout: ' + stdout);
-      //app.log.debug('stderr: ' + stderr);
       if (error !== null) {
-        //app.log.error('exec error: ' + error);
         return cb(error);
       }else{
         app.log.info(forkedRepo.blue.bold+' Succesfully cloned to '+repoLocation.yellow.bold);
-        return cb(null, repoLocation);
+        return cb(null, forkedRepo, repoLocation);
+      }
+  });
+}
+
+function switchBranch(forkedRepo, repoLocation, cb){
+  app.log.info("Attempting to switch branch on "+ repoLocation.blue.bold);
+  var gitDir= path.resolve(path.join(repoLocation,'.git')).toString();
+  var cmd1 = 'git --git-dir="'+gitDir+'" --work-tree="'+repoLocation +'" branch clean';
+  var cmd2 = 'git --git-dir="'+gitDir+'" --work-tree="'+repoLocation +'" checkout clean';
+  app.log.debug('calling: "'+cmd1.grey+'"');
+  var child = exec(cmd1,
+    function (error, stdout, stderr) {
+      if (error !== null) {
+        return cb(error);
+      }else{
+        app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'created'.green);
+        app.log.debug('calling: "'+cmd2.grey+'"');
+        var child2 = exec(cmd2,
+          function (error, stdout, stderr) {
+            if (error !== null) {
+              return cb(error);
+            }else{
+              app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'checked out'.green.bold);
+              return cb(null, repoLocation);
+            }
+        });
+      }
+  });
+}
+
+function commitRepo(forkedRepo, repoLocation, cb){
+  var message = "[fix] Changed require('sys') to require('util') for migration issues";
+  var gitDir= path.resolve(path.join(repoLocation,'.git')).toString();
+  app.log.info("Attempting a commit on "+ repoLocation.blue.bold);
+  var cmd = 'git --git-dir="'+gitDir+'" --work-tree="'+repoLocation +'" commit -am "'+message+'"';
+  app.log.debug('calling: "'+cmd.grey+'"');
+  var child = exec(cmd,
+    function (error, stdout, stderr) {
+      if (error !== null) {
+        app.log.debug('stdout: ' + stdout);
+        app.log.debug('stderr: ' + stderr);
+        return cb(error);
+      }else{
+         app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'COMMIT'.green.bold);
+        return cb(null);
+      }
+  });
+}
+function pushCommit(forkedRepo, repoLocation, cb){
+  var gitDir= path.resolve(path.join(repoLocation,'.git')).toString();
+  app.log.info("Attempting a push commit on branch clean @"+ repoLocation.blue.bold);
+  var cmd = 'git --git-dir="'+gitDir+'" --work-tree="'+repoLocation +'" push origin clean';
+  app.log.debug('calling: "'+cmd.grey+'"');
+  var child = exec(cmd,
+    function (error, stdout, stderr) {
+      app.log.debug('stdout: ' + stdout);
+      app.log.debug('stderr: ' + stderr);
+      if (error !== null) {
+        app.log.debug('stdout: ' + stdout);
+        app.log.debug('stderr: ' + stderr);
+        return cb(error);
+      }else{
+         app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'COMMIT PUSHED'.green.bold);
+        return cb(null);
       }
   });
 }
