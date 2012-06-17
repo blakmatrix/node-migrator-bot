@@ -8,8 +8,8 @@ var flatiron = require('flatiron'),
     github   = require('octonode'),
     util     = require('util'),
     exec     = require('child_process').exec,
-    username = 'XXXXXXXXXXX',
-    password = 'XXXXXXXXXXX',
+    username = 'XXXXXXXXXXXXX',
+    password = 'XXXXXXXXXXXXX',
     app      = flatiron.app;
 
 
@@ -40,16 +40,35 @@ app.commands.repo = function file(link, cb) {
   doRepoUpdate(link, cb);
 };
 
-app.cmd('user', function(){
-  app.prompt.get('name', function (err, result) {
-    app.log.info('user is  '+result.name+'!');
-  });
-});
+app.commands.user = function file(user, cb) {
+  this.log.info('Attempting get information on "' + user + '"');
+  doUserRepoUpdateStart(user, cb);
+};
 
 app.commands.file = function file(filename, cb) {
   this.log.info('Attempting to open "' + filename + '"');
   doFileUpdate(filename, cb);
 };
+
+function doUserRepoUpdateStart(user, cb){
+  var client   = github.client();
+  app.log.info('Getting '+user.red.bold+'\'s list of Repositories...');
+  client.get('/users/'+user+'/repos', function (err, status, data){
+      if (err){
+        app.log.error('error:  '+err);
+        app.log.error('status: '+status);
+        app.log.error('data:   '+data);
+        return cb(err);
+      }else{
+        async.forEach(data, doUserRepoUpdate, cb);
+      }
+    });
+  //async.forEach(results, doRepoUpdate ,cb);
+}
+function doUserRepoUpdate(repoData, cb){
+  //app.log.info(repoData["html_url"]);
+  doRepoUpdate(repoData["html_url"], cb);
+}
 
 function doRepoUpdate(link, cb){
   var re = /(http|ftp|https|git|file):\/\/(\/)?[\w-]+(\.[\w-]+)+([\w.,@?\^=%&amp;:\/~+#-]*[\w@?\^=%&amp;\/~+#-])?/gi;
@@ -72,34 +91,36 @@ function forkAndFix(link, cb){
 
   app.log.info('Forking '+user.magenta.bold+'/'+repo.yellow.bold);
   async.waterfall([
-    function(callback){
+    function (callback){
       forkRepo( forkedRepo, username, user, repo, repoLocation, callback);
     },//fork
-    function(forkedRepo, username, repo, repoLocation, callback){
+    function (forkedRepo, username, repo, repoLocation, callback){
       notifyAvailability(forkedRepo, username, repo, repoLocation, callback);
     },//,// wait for availability (whilst)
-    function(forkedRepo, repoLocation, callback){
+    function (forkedRepo, repoLocation, callback){
       cloneRepo(forkedRepo, repoLocation, callback);
     },// clone repo
-    function(forkedRepo, repoLocation, callback){
+    function (forkedRepo, repoLocation, callback){
       switchBranch(forkedRepo, repoLocation, callback);
     },// switch branch
-    function(repoLocation, callback){
+    function (repoLocation, callback){
       walkAndFix(repoLocation, callback);//? lose all variables?
     },// walkAndFix
-    function(callback){
+    function (callback){
       commitRepo(forkedRepo, repoLocation, callback);
     },// commit
-    function(callback){
-      pushCommit(forkedRepo, repoLocation, callback);
-    }// push
-    // submit pull request
+    //function (callback){
+      //pushCommit(forkedRepo, repoLocation, callback);
+    //},// push
+    function (callback){
+      submitPullRequest( username, user, repo, callback);
+    }// submit pull request
     ],
-    function(err, results){//callback
+    function (err, results){//callback
       if (err) {
           return cb(err);
         }
-        app.log.info('results = '+results);
+        app.log.info('Status: '+results);
         app.log.info('Finished fixing '+link.blue.bold);
   });
 
@@ -110,16 +131,88 @@ function forkRepo( forkedRepo, username, user, repo, repoLocation, cb){
     password: password
   });
 
-  client.me().fork(user+'/'+repo, function(err, data){
-    if(err){
+  client.me().fork(user+'/'+repo, function (err, data){
+    if (err){
       app.log.error('error: '+err);
       app.log.error('data:  '+data);
-      cb(err);
+      return cb(err);
     }else{
       return cb(null, forkedRepo, username, repo, repoLocation);
     }
   });
 }
+function submitPullRequest( username, user, repo, cb){
+  /*var client   = github.client({
+    username: username,
+    password: password
+  });
+  */
+  github.auth.config({
+    username: username,
+    password: password
+  }).login(['user', 'repo', 'gist'], function (err, id, token) {
+    app.log.info(id, token);//TODO: reuse tokens?
+
+    url = 'https://api.github.com/repos/' + user + '/' + repo + '/pulls?access_token='+token;
+    var foo = 'Hi';
+    var bodyMessage = 'Hello '+user+',\n\nI am the node-migrator-bot, I am an '+
+      '[open-source](https://github.com/blakmatrix/node-migrator-bot) robot '+
+      'that will make changes to your code to hopefully fix the issue that '+
+      'arises when you have require(\'sys\') in your code when running against '+
+      'v 0.8+ versions of node. I will change your code to reflect the proper'+
+      ' library \'util\'.\n\nIf you would like to see more take a look at '+
+      'https://github.com/joyent/node/commit/1582cf#L1R51 or '+
+      'https://github.com/joyent/node/blob/1582cfebd6719b2d2373547994b3dca5c8c569c0/ChangeLog#L51'+
+      '\n\nThanks!\nYour Friendly Neighborhood '+
+      '[node-migrator-bot](https://github.com/blakmatrix/node-migrator-bot)';
+    var payload = '{\n'+
+          '"title": "Hi! I migrated your code for you!",\n'+
+          '"body": '+JSON.stringify(bodyMessage)+',\n'+
+          '"base": "master",\n'+
+          '"head": "'+username+':clean"\n'+
+        '}';
+
+    /*client.repo(username+'/'+repo).create_pull_request_comment(
+      'id',
+      {
+        title: 'Hi! I migrated your code for you!',
+        body: JSON.stringify(bodyMessage),
+        base: 'master',
+        head: username+':clean'
+      },
+      function (err, data){
+      if (err){
+        app.log.error('error: '+err);
+        app.log.error('data:  '+data);
+        cb(err);
+      }else{
+        return cb(null, 'done');
+      }
+    });*/
+    app.log.debug('Attempting to make Pull Request to:\n'+url.green+' with the following payload:\n\n '+payload.cyan.bold);
+    request.post({url:url, body: payload}, function (error, response, body) {
+            if (!error && response.statusCode == 201) {//Status: 201 Created
+              app.log.info('Pull Request to '+user+'/'+repo+' from '+username+'/'+repo+' Succesfull!');
+              return cb(null,'Done with '+username+'/'+repo+'.');
+            }else{
+              //app.log.debug('response:');
+              //app.log.debug(response.statusCode);
+              //app.log.debug(response.body);
+              app.log.error('error: '+error);
+              if (error === null){
+                try{
+                  throw new Error( response.statusCode+' '+response.body.toString() );
+                }catch(err){
+                  cb(err);
+                }
+              }else{
+               return cb(error);
+              }
+            }
+    });
+  });
+}
+
 function cloneRepo(forkedRepo, repoLocation, cb){
   app.log.info("Attempting to clone "+ forkedRepo.blue.bold);
   var cmd = 'git clone '+forkedRepo+' "'+repoLocation+'"';
@@ -204,7 +297,7 @@ function notifyAvailability(forkedRepo, username, repo, repoLocation, cb){
   var Available = false;
   async.until(// wait for availability (whilst)
       function () {
-        if( count % 2 === 0 ){
+        if ( count % 2 === 0 ){
           app.log.info('Waiting for '+username.magenta.bold+'/'+repo.yellow.bold+' to become available...');
         }
         request.head(forkedRepo, function (error, response, body) {
@@ -220,12 +313,12 @@ function notifyAvailability(forkedRepo, username, repo, repoLocation, cb){
       },
       function (err) {
           // 5 minutes have passed
-          if(count > 300){
+          if (count > 300){
             app.log.error('Unable to find forked repo '+username.magenta.bold+'/'+repo.yellow.bold+' after 5 minutes.');
 
           }else{
           app.log.info('Forked repo '+username.magenta.bold+'/'+repo.yellow.bold+' Exists!');
-          if(Available){
+          if (Available){
             return cb(null, forkedRepo, repoLocation);
           }else{
             return cb("error: Timeout");
@@ -236,7 +329,7 @@ function notifyAvailability(forkedRepo, username, repo, repoLocation, cb){
 }
 
 function walkAndFix(link, cb){
-  walk(link, function(err, results) {
+  walk(link, function (err, results) {
       if (err) {
         return cb(err);
       }
@@ -247,25 +340,25 @@ function walkAndFix(link, cb){
 }
 function walk(dir, done) {
   var results = [];
-  fs.readdir(dir, function(err, list) {
-    if (err) return done(err);
+  fs.readdir(dir, function (err, list) {
+    if (err){ return done(err);}
     var index = list.indexOf('.git');//remove git
-    if(index >= 0){
+    if (index >= 0){
       list.splice(index, 1);
     }
     var pending = list.length;
-    if (!pending) return done(null, results);
-    list.forEach(function(file) {
+    if (!pending){ return done(null, results);}
+    list.forEach(function (file) {
       file = path.resolve(path.join(dir,file));
-      fs.stat(file, function(err, stat) {
+      fs.stat(file, function (err, stat) {
         if (stat && stat.isDirectory()) {
-          walk(file, function(err, res) {
+          walk(file, function (err, res) {
             results = results.concat(res);
-            if (!--pending) done(null, results);
+            if (!--pending){ done(null, results);}
           });
         } else {
           results.push(file);
-          if (!--pending) done(null, results);
+          if (!--pending){ done(null, results);}
         }
       });
     });
@@ -299,27 +392,27 @@ function doFileUpdate(filename, cb){
       }
       //return cb(null, fixedDoc);
       // write changes out to file
-      fs.writeFile(filename, fixedDoc, function(err) {
-          if(err) {
+      fs.writeFile(filename, fixedDoc, function (err) {
+          if (err) {
             app.log.error('The file was not saved');
-            cb(err);
+            return cb(err);
           } else {
             app.log.info(filename.blue.bold+' was modified and changed!');
-            cb(null);
+            return cb(null);
           }
       });
 
     }
     else{
-      app.log.debug('No '+'require(\'sys\')'.magenta.bold+' text found in '+filename.blue.bold+", no modifications made.");
-      cb(null);
+      app.log.debug('No '+'require("sys")'.magenta.bold+' text found in '+filename.blue.bold+", no modifications made.");
+      return cb(null);
     }
   });
 }
 
 app.start( function (err){
   if (err) {
-    app.log.error(err.message || 'You didn\'t call any commands!');
+    app.log.error(err.message || 'You didn"t call any commands!');
     app.log.warn('node-migrator-bot'.grey + ' NOT OK.');
     return process.exit(1);
   }
