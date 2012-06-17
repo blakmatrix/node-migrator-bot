@@ -11,3 +11,4 @@ sys.puts("1 ");
 sys.puts("2");
 sys.puts("3");
 
+getNewFile(function (err, file) { if (err) { throw err; } /* do something with file */ });

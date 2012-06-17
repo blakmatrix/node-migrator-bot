@@ -1,0 +1,1 @@
+Don't delete this folder, this is where the bot puts cloned repositories
