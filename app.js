@@ -71,8 +71,9 @@ function doUserRepoUpdate(repoData, cb){
 
 function doRepoUpdate(link, cb){
   var re = /(http|ftp|https|git|file):\/\/(\/)?[\w-]+(\.[\w-]+)+([\w.,@?\^=%&amp;:\/~+#-]*[\w@?\^=%&amp;\/~+#-])?/gi;
+  var reSSH =/git@github.com:.*\/.*(\.git$|$)/g;
 
-  if (XRegExp.test(link, re)) {
+  if (XRegExp.test(link, re) || XRegExp.test(link, reSSH)) {
     app.log.info(link.blue.bold+' is a url');
     forkAndFix(link, cb);
   }else{
@@ -82,12 +83,12 @@ function doRepoUpdate(link, cb){
 }
 
 function forkAndFix(link, cb){
-  var parse    = XRegExp(/.*github.com\/(.*)\/(.*?)(\.git$|$)/g);
+  var parse    = XRegExp(/.*github.com[\/|:](.*)\/(.*?)(\.git$|$)/g);
   var user     = XRegExp.replace(link, parse, '$1');
   var repo     = XRegExp.replace(link, parse, '$2');
   var forkedRepo = 'https://github.com/'+username+'/'+repo;
   var tmpDir = path.resolve(path.join('.','tmp'));
-  var repoLocation = path.resolve(path.join(tmpDir,repo)).toString();
+  var repoLocation = path.resolve(path.join(path.join(tmpDir,user), repo)).toString();
 
   app.log.info('Forking '+user.magenta.bold+'/'+repo.yellow.bold);
   async.waterfall([
@@ -120,8 +121,7 @@ function forkAndFix(link, cb){
       if (err) {
           return cb(err);
         }
-        app.log.info('node-migrator-bot '.grey+result);
-        app.log.info('Done with '+link.blue.bold);
+        app.log.info('node-migrator-bot'.grey+' Done with '.green+link.blue.bold+' RESULT: '.grey+result);
         return cb(null, result);
   });
 }
@@ -227,7 +227,12 @@ function cloneRepo(repo, forkedRepo, repoLocation, status, cb){
   var child = exec(cmd,
     function (error, stdout, stderr) {
       if (error !== null) {
-        return cb(error);
+        if (stderr.indexOf('already exists') != -1 ){
+          app.log.warn(forkedRepo.blue.bold+' FAILED cloned to '.red.bold+repoLocation.yellow.bold+' : We may have already cloned this one!'.magenta.bold);
+          return cb(null, 'OK'); //ok? should we assume it might not have been processed? Lets see where it goes... shouldn't hurt
+        }else{
+          return cb(error);
+        }
       }else{
         app.log.info(forkedRepo.blue.bold+' Succesfully cloned to '+repoLocation.yellow.bold);
         return cb(null, 'OK');
@@ -243,10 +248,14 @@ function switchBranch(forkedRepo, repoLocation, status, cb){
   app.log.debug('calling: "'+cmd1.grey+'"');
   var child = exec(cmd1,
     function (error, stdout, stderr) {
-      if (error !== null) {
+      if (error !== null && stderr != 'fatal: A branch named \'clean\' already exists.\n' ) {
         return cb(error);
       }else{
-        app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'created'.green);
+        if(stderr == 'fatal: A branch named \'clean\' already exists.\n'){
+          app.log.warn('A branch named \'clean\' '+'already exists'.red.bold+' @'+repoLocation.yellow.bold);
+        }else{
+          app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'created'.green);
+        }
         app.log.debug('calling: "'+cmd2.grey+'"');
         var child2 = exec(cmd2,
           function (error, stdout, stderr) {
@@ -274,11 +283,8 @@ function commitRepo(forkedRepo, repoLocation, status, cb){
   var child = exec(cmd,
     function (error, stdout, stderr) {
       if (error !== null) {
-        console.dir(error);
         app.log.debug('stdout: ' + stdout);
-        console.dir(stdout);
         app.log.debug('stderr: ' + stderr);
-        console.dir(stderr);
         if (stdout == '# On branch clean\nnothing to commit (working directory clean)\n'){
           app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'NOTHING TO COMMIT'.red.bold);
           return cb(null, 'DONE');
@@ -303,12 +309,15 @@ function pushCommit(forkedRepo, repoLocation, status, cb){
   var child = exec(cmd,
     function (error, stdout, stderr) {
       if (error !== null) {
-        console.dir(error);
         app.log.debug('stdout: ' + stdout);
-        console.dir(stdout);
         app.log.debug('stderr: ' + stderr);
-        console.dir(stdout);
-        return cb(error);
+
+        if( stdout == 'To prevent you from losing history, non-fast-forward updates were rejected\nMerge the remote changes before pushing again.  See the \'Note about\nfast-forwards\' section of \'git push --help\' for details.\n'){
+          app.log.warn(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'COMMIT NOT PUSHED'.red.bold+' : We may have already pushed to this fork!'.magenta.bold);
+          return cb(null, 'DONE');
+        }else{
+          return cb(error);
+        }
       }else{
          app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'COMMIT PUSHED'.green.bold);
         return cb(null, 'OK');
@@ -362,9 +371,10 @@ function walkAndFix(link, status, cb){
         if (err) {
           return cb(err);
         }
-        app.log.debug(results);
-        app.log.debug(results.indexOf('OK'));
+        //app.log.debug(results);
+        //app.log.debug(results.indexOf('OK'));
         if(results.indexOf('OK') == -1){
+          app.log.warn('No changes to make for '.bold.red+link.yellow);
           return cb(null, 'DONE');
         }else{
           return cb(null, 'OK');
