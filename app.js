@@ -13,6 +13,15 @@ var flatiron = require('flatiron'),
     app      = flatiron.app;
 
 
+var gitQue = async.queue(function (task, callback) {
+    app.log.info('GITQUE: Recieved New Task.'.cyan.bold);
+    app.log.info('Running: '.green.bold+task["info"].toString().magenta );
+    callback(null, task);
+}, 1);
+
+gitQue.drain = function() {
+    app.log.info('GITQUE: Task Finished.'.cyan.bold);
+};
 
 app.config.file({ file: path.join(__dirname, 'config', 'config.json') });
 
@@ -99,19 +108,19 @@ function forkAndFix(link, cb){
       notifyAvailability(forkedRepo, username, repo, repoLocation, status, callback);
     },//,// wait for availability (whilst)
     function (status, callback){
-      cloneRepo(repo, forkedRepo, repoLocation, status, callback);
+      gitQue.push({task: cloneRepo(repo, forkedRepo, repoLocation, status, callback), info: '   cloneRepo : '+forkedRepo});
     },// clone repo
     function (status, callback){
-      switchBranch(forkedRepo, repoLocation, status, callback);
+      gitQue.push({task: switchBranch(forkedRepo, repoLocation, status, callback), info: 'switchBranch : '+forkedRepo});
     },// switch branch
     function (status, callback){
       walkAndFix(repoLocation, status, callback);//? lose all variables?
     },// walkAndFix
     function (status, callback ){
-      commitRepo(forkedRepo, repoLocation, status, callback);
+      gitQue.push({task: commitRepo(forkedRepo, repoLocation, status, callback), info: '  commitRepo : '+forkedRepo});
     },// commit
     function (status, callback){
-      pushCommit(forkedRepo, repoLocation, status, callback);
+      gitQue.push({task: pushCommit(forkedRepo, repoLocation, status, callback), info: '  pushCommit : '+forkedRepo});
     },// push
     function (status, callback){
       submitPullRequest( username, user, repo, status, callback);
@@ -254,7 +263,12 @@ function switchBranch(forkedRepo, repoLocation, status, cb){
         console.dir(error);
         console.dir(stdout);
         console.dir(stderr);
-        return cb(error);
+        if (stderr == 'fatal: Not a valid object name: \'master\'.\n' ){//sometimes if repo is empty or at first commit
+          app.log.warn('The Repo might be empty or at first commit... no master found...'.red);
+          return cb(null, 'DONE');
+        }else{
+          return cb(error);
+        }
       }else{
         if(stderr == 'fatal: A branch named \'clean\' already exists.\n'){
           app.log.warn('A branch named \'clean\' '+'already exists'.red.bold+' @'+repoLocation.yellow.bold);
@@ -401,11 +415,16 @@ function isNotOK(element, index, array) {
   return (element != 'OK');
 }
 
+//function filterFiles(list){
+  //var removeFromList = [ \\.git\g,  '.*\.tar',  '.*\.exe',  '.*\.bin'];
+//}
+
 function walk(dir, done) {
   var results = [];
   fs.readdir(dir, function (err, list) {
     if (err){ return done(err);}
-    var index = list.indexOf('.git');//remove git
+    var index = list.indexOf('.git');//remove git folder
+    app.log.info('list ='+list);
     if (index >= 0){
       list.splice(index, 1);
     }
