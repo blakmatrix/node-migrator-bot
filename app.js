@@ -8,8 +8,8 @@ var flatiron = require('flatiron'),
     github   = require('octonode'),
     util     = require('util'),
     exec     = require('child_process').exec,
-    username = 'XXXXXXXXXXXX',
-    password = 'XXXXXXXXXXXX!',
+    username = 'XXXXXXXXXXXXX',
+    password = 'XXXXXXXXXXXXX',
     app      = flatiron.app;
 
 
@@ -98,7 +98,7 @@ function forkAndFix(link, cb){
       notifyAvailability(forkedRepo, username, repo, repoLocation, status, callback);
     },//,// wait for availability (whilst)
     function (status, callback){
-      cloneRepo(forkedRepo, repoLocation, status, callback);
+      cloneRepo(repo, forkedRepo, repoLocation, status, callback);
     },// clone repo
     function (status, callback){
       switchBranch(forkedRepo, repoLocation, status, callback);
@@ -122,6 +122,7 @@ function forkAndFix(link, cb){
         }
         app.log.info('node-migrator-bot '.grey+result);
         app.log.info('Done with '+link.blue.bold);
+        return cb(null, result);
   });
 }
 
@@ -164,7 +165,7 @@ function submitPullRequest( username, user, repo, status, cb){
       'that will make changes to your code to hopefully fix the issue that '+
       'arises when you have require(\'sys\') in your code when running against '+
       'v 0.8+ versions of node. I will change your code to reflect the proper'+
-      ' library \'util\'.\n\nIf you would like to see more take a look at '+
+      ' library \'util\'.\n\nIf you would like to know more take a look at '+
       'https://github.com/joyent/node/commit/1582cf#L1R51 or '+
       'https://github.com/joyent/node/blob/1582cfebd6719b2d2373547994b3dca5c8c569c0/ChangeLog#L51'+
       '\n\nThanks!\nYour Friendly Neighborhood '+
@@ -217,9 +218,11 @@ function submitPullRequest( username, user, repo, status, cb){
   });
 }
 
-function cloneRepo(forkedRepo, repoLocation, status, cb){
+function cloneRepo(repo, forkedRepo, repoLocation, status, cb){
   app.log.info("Attempting to clone "+ forkedRepo.blue.bold);
-  var cmd = 'git clone '+forkedRepo+' "'+repoLocation+'"';
+  //ssh git@github.com:username/repo.git
+  //var cmd = 'git clone '+forkedRepo+'.git "'+repoLocation+'"';
+  var cmd = 'git clone git@github.com:'+username+'/'+repo+'.git "'+repoLocation+'"';
   app.log.debug('calling: "'+cmd.grey+'"');
   var child = exec(cmd,
     function (error, stdout, stderr) {
@@ -299,11 +302,12 @@ function pushCommit(forkedRepo, repoLocation, status, cb){
   app.log.debug('calling: "'+cmd.grey+'"');
   var child = exec(cmd,
     function (error, stdout, stderr) {
-      app.log.debug('stdout: ' + stdout);
-      app.log.debug('stderr: ' + stderr);
       if (error !== null) {
+        console.dir(error);
         app.log.debug('stdout: ' + stdout);
+        console.dir(stdout);
         app.log.debug('stderr: ' + stderr);
+        console.dir(stdout);
         return cb(error);
       }else{
          app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'COMMIT PUSHED'.green.bold);
