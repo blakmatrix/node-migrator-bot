@@ -1,7 +1,7 @@
 node-migrator-bot
 ======
 
-Migrate your old Node.js Repos, Intended to change require('sys') text to
+Migrate your old Node.js Repos, Intended to change require('util') text to
 require('util') as it has been changed in node v 0.3+.
 
 [![build status](https://secure.travis-ci.org/blakmatrix/node-migrator-bot.png)](http://travis-ci.org/blakmatrix/node-migrator-bot)
