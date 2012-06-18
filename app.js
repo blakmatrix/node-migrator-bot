@@ -162,7 +162,7 @@ function switchBranch(forkedRepo, repoLocation, cb){
 }
 
 function commitRepo(forkedRepo, repoLocation, cb){
-  var message = "[fix] Changed require('sys') to require('util') for migration issues";
+  var message = "[fix] Changed require('util') to require('util') for migration issues";
   var gitDir= path.resolve(path.join(repoLocation,'.git')).toString();
   app.log.info("Attempting a commit on "+ repoLocation.blue.bold);
   var cmd = 'git --git-dir="'+gitDir+'" --work-tree="'+repoLocation +'" commit -am "'+message+'"';
