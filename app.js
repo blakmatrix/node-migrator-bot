@@ -415,9 +415,11 @@ function isNotOK(element, index, array) {
   return (element != 'OK');
 }
 
-//function filterFiles(list){
-  //var removeFromList = [ \\.git\g,  '.*\.tar',  '.*\.exe',  '.*\.bin'];
-//}
+function filterString(str){
+  var re = /^(\w*((\.js)|(\.txt)|(\.md)|(\.markdown))?|readme.*)$/gi;
+  // only choose folders and no ext files, *.js, *.txt, *.md, *.markdown, and readme files
+  return XRegExp.test(str, re);
+}
 
 function walk(dir, done) {
   var results = [];
@@ -428,6 +430,8 @@ function walk(dir, done) {
     if (index >= 0){
       list.splice(index, 1);
     }
+    var modList = list.filter(filterString);//filter out the undesirables
+    list = modList;
     var pending = list.length;
     if (!pending){ return done(null, results);}
     list.forEach(function (file) {
