@@ -8,8 +8,8 @@ var flatiron = require('flatiron'),
     github   = require('octonode'),
     util     = require('util'),
     exec     = require('child_process').exec,
-    username = 'XXXXXXXXXXXXX',
-    password = 'XXXXXXXXXXXXX',
+    username = 'XXXXXXXXXXXX',
+    password = 'XXXXXXXXXXXX!',
     app      = flatiron.app;
 
 
@@ -63,10 +63,9 @@ function doUserRepoUpdateStart(user, cb){
         async.forEach(data, doUserRepoUpdate, cb);
       }
     });
-  //async.forEach(results, doRepoUpdate ,cb);
 }
+
 function doUserRepoUpdate(repoData, cb){
-  //app.log.info(repoData["html_url"]);
   doRepoUpdate(repoData["html_url"], cb);
 }
 
@@ -78,9 +77,10 @@ function doRepoUpdate(link, cb){
     forkAndFix(link, cb);
   }else{
     app.log.info(link.blue.bold+' is a folder');
-    walkAndFix(link, cb);
+    walkAndFix(link, 'OK', cb);
   }
 }
+
 function forkAndFix(link, cb){
   var parse    = XRegExp(/.*github.com\/(.*)\/(.*?)(\.git$|$)/g);
   var user     = XRegExp.replace(link, parse, '$1');
@@ -94,37 +94,37 @@ function forkAndFix(link, cb){
     function (callback){
       forkRepo( forkedRepo, username, user, repo, repoLocation, callback);
     },//fork
-    function (forkedRepo, username, repo, repoLocation, callback){
-      notifyAvailability(forkedRepo, username, repo, repoLocation, callback);
+    function (status, callback){
+      notifyAvailability(forkedRepo, username, repo, repoLocation, status, callback);
     },//,// wait for availability (whilst)
-    function (forkedRepo, repoLocation, callback){
-      cloneRepo(forkedRepo, repoLocation, callback);
+    function (status, callback){
+      cloneRepo(forkedRepo, repoLocation, status, callback);
     },// clone repo
-    function (forkedRepo, repoLocation, callback){
-      switchBranch(forkedRepo, repoLocation, callback);
+    function (status, callback){
+      switchBranch(forkedRepo, repoLocation, status, callback);
     },// switch branch
-    function (repoLocation, callback){
-      walkAndFix(repoLocation, callback);//? lose all variables?
+    function (status, callback){
+      walkAndFix(repoLocation, status, callback);//? lose all variables?
     },// walkAndFix
-    function (callback){
-      commitRepo(forkedRepo, repoLocation, callback);
+    function (status, callback ){
+      commitRepo(forkedRepo, repoLocation, status, callback);
     },// commit
-    //function (callback){
-      //pushCommit(forkedRepo, repoLocation, callback);
-    //},// push
-    function (callback){
-      submitPullRequest( username, user, repo, callback);
+    function (status, callback){
+      pushCommit(forkedRepo, repoLocation, status, callback);
+    },// push
+    function (status, callback){
+      submitPullRequest( username, user, repo, status, callback);
     }// submit pull request
     ],
-    function (err, results){//callback
+    function (err, result){//callback
       if (err) {
           return cb(err);
         }
-        app.log.info('Status: '+results);
-        app.log.info('Finished fixing '+link.blue.bold);
+        app.log.info('node-migrator-bot '.grey+result);
+        app.log.info('Done with '+link.blue.bold);
   });
-
 }
+
 function forkRepo( forkedRepo, username, user, repo, repoLocation, cb){
   var client   = github.client({
     username: username,
@@ -137,11 +137,15 @@ function forkRepo( forkedRepo, username, user, repo, repoLocation, cb){
       app.log.error('data:  '+data);
       return cb(err);
     }else{
-      return cb(null, forkedRepo, username, repo, repoLocation);
+      return cb(null, 'OK');
     }
   });
 }
-function submitPullRequest( username, user, repo, cb){
+
+function submitPullRequest( username, user, repo, status, cb){
+  if (status == 'DONE'){
+    return cb(null, 'DONE');
+  }
   /*var client   = github.client({
     username: username,
     password: password
@@ -193,7 +197,7 @@ function submitPullRequest( username, user, repo, cb){
     request.post({url:url, body: payload}, function (error, response, body) {
             if (!error && response.statusCode == 201) {//Status: 201 Created
               app.log.info('Pull Request to '+user+'/'+repo+' from '+username+'/'+repo+' Succesfull!');
-              return cb(null,'Done with '+username+'/'+repo+'.');
+              return cb(null,'DONE');
             }else{
               //app.log.debug('response:');
               //app.log.debug(response.statusCode);
@@ -213,7 +217,7 @@ function submitPullRequest( username, user, repo, cb){
   });
 }
 
-function cloneRepo(forkedRepo, repoLocation, cb){
+function cloneRepo(forkedRepo, repoLocation, status, cb){
   app.log.info("Attempting to clone "+ forkedRepo.blue.bold);
   var cmd = 'git clone '+forkedRepo+' "'+repoLocation+'"';
   app.log.debug('calling: "'+cmd.grey+'"');
@@ -223,12 +227,12 @@ function cloneRepo(forkedRepo, repoLocation, cb){
         return cb(error);
       }else{
         app.log.info(forkedRepo.blue.bold+' Succesfully cloned to '+repoLocation.yellow.bold);
-        return cb(null, forkedRepo, repoLocation);
+        return cb(null, 'OK');
       }
   });
 }
 
-function switchBranch(forkedRepo, repoLocation, cb){
+function switchBranch(forkedRepo, repoLocation, status, cb){
   app.log.info("Attempting to switch branch on "+ repoLocation.blue.bold);
   var gitDir= path.resolve(path.join(repoLocation,'.git')).toString();
   var cmd1 = 'git --git-dir="'+gitDir+'" --work-tree="'+repoLocation +'" branch clean';
@@ -247,14 +251,18 @@ function switchBranch(forkedRepo, repoLocation, cb){
               return cb(error);
             }else{
               app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'checked out'.green.bold);
-              return cb(null, repoLocation);
+              return cb(null, 'OK');
             }
         });
       }
   });
 }
 
-function commitRepo(forkedRepo, repoLocation, cb){
+function commitRepo(forkedRepo, repoLocation, status, cb){
+
+  if (status == 'DONE'){
+    return cb(null, 'DONE');
+  }
   var message = "[fix] Changed require('sys') to require('util') for migration issues";
   var gitDir= path.resolve(path.join(repoLocation,'.git')).toString();
   app.log.info("Attempting a commit on "+ repoLocation.blue.bold);
@@ -263,16 +271,28 @@ function commitRepo(forkedRepo, repoLocation, cb){
   var child = exec(cmd,
     function (error, stdout, stderr) {
       if (error !== null) {
+        console.dir(error);
         app.log.debug('stdout: ' + stdout);
+        console.dir(stdout);
         app.log.debug('stderr: ' + stderr);
-        return cb(error);
+        console.dir(stderr);
+        if (stdout == '# On branch clean\nnothing to commit (working directory clean)\n'){
+          app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'NOTHING TO COMMIT'.red.bold);
+          return cb(null, 'DONE');
+        }else{
+         return cb(error);
+        }
       }else{
          app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'COMMIT'.green.bold);
-        return cb(null);
+        return cb(null, 'OK');
       }
   });
 }
-function pushCommit(forkedRepo, repoLocation, cb){
+
+function pushCommit(forkedRepo, repoLocation, status, cb){
+  if (status == 'DONE'){
+    return cb(null, 'DONE');
+  }
   var gitDir= path.resolve(path.join(repoLocation,'.git')).toString();
   app.log.info("Attempting a push commit on branch clean @"+ repoLocation.blue.bold);
   var cmd = 'git --git-dir="'+gitDir+'" --work-tree="'+repoLocation +'" push origin clean';
@@ -287,12 +307,12 @@ function pushCommit(forkedRepo, repoLocation, cb){
         return cb(error);
       }else{
          app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'COMMIT PUSHED'.green.bold);
-        return cb(null);
+        return cb(null, 'OK');
       }
   });
 }
 
-function notifyAvailability(forkedRepo, username, repo, repoLocation, cb){
+function notifyAvailability(forkedRepo, username, repo, repoLocation, status, cb){
   var count    = 0;
   var Available = false;
   async.until(// wait for availability (whilst)
@@ -319,7 +339,7 @@ function notifyAvailability(forkedRepo, username, repo, repoLocation, cb){
           }else{
           app.log.info('Forked repo '+username.magenta.bold+'/'+repo.yellow.bold+' Exists!');
           if (Available){
-            return cb(null, forkedRepo, repoLocation);
+            return cb(null, 'OK');
           }else{
             return cb("error: Timeout");
           }
@@ -328,16 +348,32 @@ function notifyAvailability(forkedRepo, username, repo, repoLocation, cb){
     );
 }
 
-function walkAndFix(link, cb){
+function walkAndFix(link, status, cb){
   walk(link, function (err, results) {
       if (err) {
         return cb(err);
       }
 
-      async.forEach(results, doFileUpdate ,cb);
+      async.map(results, doFileUpdate ,function(err, results){
+        if (err) {
+          return cb(err);
+        }
+        app.log.debug(results);
+        app.log.debug(results.indexOf('OK'));
+        if(results.indexOf('OK') == -1){
+          return cb(null, 'DONE');
+        }else{
+          return cb(null, 'OK');
+        }
+      });
 
     });
 }
+
+function isNotOK(element, index, array) {
+  return (element != 'OK');
+}
+
 function walk(dir, done) {
   var results = [];
   fs.readdir(dir, function (err, list) {
@@ -398,14 +434,14 @@ function doFileUpdate(filename, cb){
             return cb(err);
           } else {
             app.log.info(filename.blue.bold+' was modified and changed!');
-            return cb(null);
+            return cb(null, 'OK');
           }
       });
 
     }
     else{
-      app.log.debug('No '+'require("sys")'.magenta.bold+' text found in '+filename.blue.bold+", no modifications made.");
-      return cb(null);
+      app.log.debug('No '+'require("sys")'.magenta.bold+' text found in '+filename.blue.bold);
+      return cb(null, 'NO CHANGE');
     }
   });
 }
