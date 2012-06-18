@@ -284,7 +284,7 @@ function commitRepo(forkedRepo, repoLocation, status, cb){
   if (status == 'DONE'){
     return cb(null, 'DONE');
   }
-  var message = "[fix] Changed require('sys') to require('util') for migration issues";
+  var message = "[fix] Changed require('util') to require('util') for migration issues";
   var gitDir= path.resolve(path.join(repoLocation,'.git')).toString();
   app.log.info("Attempting a commit on "+ repoLocation.blue.bold);
   var cmd = 'git --git-dir="'+gitDir+'" --work-tree="'+repoLocation +'" commit -am "'+message+'"';
@@ -467,7 +467,7 @@ function doFileUpdate(filename, cb){
 
     }
     else{
-      app.log.debug('No '+'require("sys")'.magenta.bold+' text found in '+filename.blue.bold);
+      app.log.debug('No '+'require('util')'.magenta.bold+' text found in '+filename.blue.bold);
       return cb(null, 'NO CHANGE');
     }
   });
