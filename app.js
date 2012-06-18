@@ -227,6 +227,7 @@ function cloneRepo(repo, forkedRepo, repoLocation, status, cb){
   var child = exec(cmd,
     function (error, stdout, stderr) {
       if (error !== null) {
+        app.log.warn('cloneRepo: '+forkedRepo.blue.bold+' ERROR DETECTED!'.red.bold);
         if (stderr.indexOf('already exists') != -1 ){
           app.log.warn(forkedRepo.blue.bold+' FAILED cloned to '.red.bold+repoLocation.yellow.bold+' : We may have already cloned this one!'.magenta.bold);
           return cb(null, 'OK'); //ok? should we assume it might not have been processed? Lets see where it goes... shouldn't hurt
@@ -249,6 +250,10 @@ function switchBranch(forkedRepo, repoLocation, status, cb){
   var child = exec(cmd1,
     function (error, stdout, stderr) {
       if (error !== null && stderr != 'fatal: A branch named \'clean\' already exists.\n' ) {
+        app.log.warn('switchBranch::1: '+forkedRepo.blue.bold+' ERROR DETECTED!'.red.bold);
+        console.dir(error);
+        console.dir(stdout);
+        console.dir(stderr);
         return cb(error);
       }else{
         if(stderr == 'fatal: A branch named \'clean\' already exists.\n'){
@@ -260,6 +265,10 @@ function switchBranch(forkedRepo, repoLocation, status, cb){
         var child2 = exec(cmd2,
           function (error, stdout, stderr) {
             if (error !== null) {
+              app.log.warn('switchBranch::2: '+forkedRepo.blue.bold+' ERROR DETECTED!'.red.bold);
+              console.dir(error);
+              console.dir(stdout);
+              console.dir(stderr);
               return cb(error);
             }else{
               app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'checked out'.green.bold);
@@ -283,8 +292,10 @@ function commitRepo(forkedRepo, repoLocation, status, cb){
   var child = exec(cmd,
     function (error, stdout, stderr) {
       if (error !== null) {
-        app.log.debug('stdout: ' + stdout);
-        app.log.debug('stderr: ' + stderr);
+        app.log.warn('commitRepo: '+forkedRepo.blue.bold+' ERROR DETECTED!'.red.bold);
+        console.dir(error);
+        console.dir(stdout);
+        console.dir(stderr);
         if (stdout == '# On branch clean\nnothing to commit (working directory clean)\n'){
           app.log.info(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'NOTHING TO COMMIT'.red.bold);
           return cb(null, 'DONE');
@@ -309,8 +320,10 @@ function pushCommit(forkedRepo, repoLocation, status, cb){
   var child = exec(cmd,
     function (error, stdout, stderr) {
       if (error !== null) {
-        app.log.debug('stdout: ' + stdout);
-        app.log.debug('stderr: ' + stderr);
+        app.log.warn('pushCommit: '+forkedRepo.blue.bold+' ERROR DETECTED!'.red.bold);
+        console.dir(error);
+        console.dir(stdout);
+        console.dir(stderr);
 
         if( stdout == 'To prevent you from losing history, non-fast-forward updates were rejected\nMerge the remote changes before pushing again.  See the \'Note about\nfast-forwards\' section of \'git push --help\' for details.\n'){
           app.log.warn(forkedRepo.blue.bold+'@'+repoLocation.yellow.bold+':clean branch '+'COMMIT NOT PUSHED'.red.bold+' : We may have already pushed to this fork!'.magenta.bold);
