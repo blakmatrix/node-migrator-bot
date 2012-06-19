@@ -49,6 +49,7 @@ app.commands.repo = function file(link, cb) {
 app.commands.npm = function file(link, cb) {
   this.log.warn('Running on all available npm repositories that are hosted on github!!!'.red.bold);
   doNPMUpdate(cb);
+  //npmShortCircuit(cb);
 };
 
 app.commands.user = function file(user, cb) {
@@ -61,6 +62,17 @@ app.commands.file = function file(filename, cb) {
   doFileUpdate(filename, cb);
 };
 
+function npmShortCircuit(cb) {
+  var ex = ['git://github.com/eller86/surrogate-pair.js.git', 'git://github.com/vesln/surround.git', 'git@github.com:sebv/sv-cake-utils.git'];
+  async.forEachSeries(ex, doRepoUpdate, function (err) {
+    if (err) {
+      app.log.warn('Error processing npm repositories that are hosted on github!!!'.red.bold);
+      return cb(err);
+    } else {
+      return cb(null, 'OK');
+    }
+  });
+}
 function doNPMUpdate(cb) {
   app.log.debug("doNPMUpdate");
   getNPMRepos(function (err, results) {
@@ -128,7 +140,7 @@ function doUserRepoUpdate(repoData, cb) {
 }
 
 function doRepoUpdate(link, cb) {
-  var re = /(http|ftp|https|git|file):\/\/(\/)?[\w\-] + (\.[\w\-] + ) + ([\w.,@?\^=%&amp;:\/~ + #\-]*[\w@?\^=%&amp;\/~ + #\-])?/gi,
+  var re = /(http|ftp|https|git|file):\/\/(\/)?[\w\-]+(\.[\w\-]+)+([\w.,@?\^=%&amp;:\/~+#\-]*[\w@?\^=%&amp;\/~+#\-])?/gi,
    reSSH = /git@github\.com:.*\/.*(\.git$|$)/g;
 
   if (XRegExp.test(link, re) || XRegExp.test(link, reSSH)) {
@@ -284,15 +296,15 @@ function submitPullRequest(username, user, repo, status, cb) {
               app.log.error('error: ' + error);
               if (error === null) {
                 try {
-                  throw new Error(response.statusCode + ' ' + response.body.toString() );
-                }catch(err) {
+                  throw new Error(response.statusCode + ' ' + response.body.toString());
+                }catch (err) {
                   cb(err);
                 }
               } else {
-               return cb(error);
+                return cb(error);
               }
             }
-    });
+          });
   });
 }
 
@@ -301,16 +313,17 @@ function cloneRepo(repo, forkedRepo, repoLocation, status, cb) {
     app.log.info("Skipping clone of" +  forkedRepo.blue.bold);
     return cb(null, 'DONE');
   }
+  var cmd, child;
   app.log.info("Attempting to clone " +  forkedRepo.blue.bold);
   //ssh git@github.com:username/repo.git
   //var cmd = 'git clone ' + forkedRepo + '.git "' + repoLocation + '"';
-  var cmd = 'git clone git@github.com:' + username + '/' + repo + '.git "' + repoLocation + '"';
+  cmd = 'git clone git@github.com:' + username + '/' + repo + '.git "' + repoLocation + '"';
   app.log.debug('calling: "' + cmd.grey + '"');
-  var child = exec(cmd,
+  child = exec(cmd,
     function (error, stdout, stderr) {
       if (error !== null) {
         app.log.warn('cloneRepo: ' + forkedRepo.blue.bold + ' ERROR DETECTED!'.red.bold);
-        if (stderr.indexOf('already exists') != -1 ) {
+        if (stderr.indexOf('already exists') !== -1) {
           app.log.warn(forkedRepo.blue.bold + ' FAILED cloned to '.red.bold + repoLocation.yellow.bold + ' : We may have already cloned this one!'.magenta.bold);
           return cb(null, 'OK'); //ok? should we assume it might not have been processed? Lets see where it goes... shouldn't hurt
         } else {
@@ -320,33 +333,34 @@ function cloneRepo(repo, forkedRepo, repoLocation, status, cb) {
         app.log.info(forkedRepo.blue.bold + ' Succesfully cloned to ' + repoLocation.yellow.bold);
         return cb(null, 'OK');
       }
-  });
+    });
 }
 
 function switchBranch(forkedRepo, repoLocation, status, cb) {
-  if (status == 'DONE') {
+  if (status === 'DONE') {
     return cb(null, 'DONE');
   }
+  var gitDir, cmd1, cmd2, child;
   app.log.info("Attempting to switch branch on " +  repoLocation.blue.bold);
-  var gitDir= path.resolve(path.join(repoLocation,'.git')).toString();
-  var cmd1 = 'git --git-dir="' + gitDir + '" --work-tree="' + repoLocation  + '" branch clean';
-  var cmd2 = 'git --git-dir="' + gitDir + '" --work-tree="' + repoLocation  + '" checkout clean';
+  gitDir = path.resolve(path.join(repoLocation, '.git')).toString();
+  cmd1 = 'git --git-dir="' + gitDir + '" --work-tree="' + repoLocation  + '" branch clean';
+  cmd2 = 'git --git-dir="' + gitDir + '" --work-tree="' + repoLocation  + '" checkout clean';
   app.log.debug('calling: "' + cmd1.grey + '"');
-  var child = exec(cmd1,
+  child = exec(cmd1,
     function (error, stdout, stderr) {
-      if (error !== null && stderr != 'fatal: A branch named \'clean\' already exists.\n' ) {
+      if (error !== null && stderr !== 'fatal: A branch named \'clean\' already exists.\n') {
         app.log.warn('switchBranch::1: ' + forkedRepo.blue.bold + ' ERROR DETECTED!'.red.bold);
         console.dir(error);
         console.dir(stdout);
         console.dir(stderr);
-        if (stderr == 'fatal: Not a valid object name: \'master\'.\n' ) {//sometimes if repo is empty or at first commit
+        if (stderr === 'fatal: Not a valid object name: \'master\'.\n') {//sometimes if repo is empty or at first commit
           app.log.warn('The Repo might be empty or at first commit... no master found...'.red);
           return cb(null, 'DONE');
         } else {
           return cb(error);
         }
       } else {
-        if (stderr == 'fatal: A branch named \'clean\' already exists.\n') {
+        if (stderr === 'fatal: A branch named \'clean\' already exists.\n') {
           app.log.warn('A branch named \'clean\' ' + 'already exists'.red.bold + ' @' + repoLocation.yellow.bold);
         } else {
           app.log.info(forkedRepo.blue.bold + '@' + repoLocation.yellow.bold + ':clean branch ' + 'created'.green);
@@ -364,50 +378,52 @@ function switchBranch(forkedRepo, repoLocation, status, cb) {
               app.log.info(forkedRepo.blue.bold + '@' + repoLocation.yellow.bold + ':clean branch ' + 'checked out'.green.bold);
               return cb(null, 'OK');
             }
-        });
+          });
       }
-  });
+    });
 }
 
 function commitRepo(forkedRepo, repoLocation, status, cb) {
 
-  if (status == 'DONE') {
+  if (status === 'DONE') {
     return cb(null, 'DONE');
   }
-  var message = "[fix] Changed require('sys') to require('util') for migration issues";
-  var gitDir= path.resolve(path.join(repoLocation,'.git')).toString();
+  var gitDir, cmd, child, message;
+  message = "[fix] Changed require('sys') to require('util') for migration issues";
+  gitDir = path.resolve(path.join(repoLocation, '.git')).toString();
   app.log.info("Attempting a commit on " +  repoLocation.blue.bold);
-  var cmd = 'git --git-dir="' + gitDir + '" --work-tree="' + repoLocation  + '" commit -am "' + message + '"';
+  cmd = 'git --git-dir="' + gitDir + '" --work-tree="' + repoLocation  + '" commit -am "' + message + '"';
   app.log.debug('calling: "' + cmd.grey + '"');
-  var child = exec(cmd,
+  child = exec(cmd,
     function (error, stdout, stderr) {
       if (error !== null) {
         app.log.warn('commitRepo: ' + forkedRepo.blue.bold + ' ERROR DETECTED!'.red.bold);
         console.dir(error);
         console.dir(stdout);
         console.dir(stderr);
-        if (stdout == '# On branch clean\nnothing to commit (working directory clean)\n') {
+        if (stdout === '# On branch clean\nnothing to commit (working directory clean)\n') {
           app.log.info(forkedRepo.blue.bold + '@' + repoLocation.yellow.bold + ':clean branch ' + 'NOTHING TO COMMIT'.red.bold);
           return cb(null, 'DONE');
         } else {
-         return cb(error);
+          return cb(error);
         }
       } else {
-         app.log.info(forkedRepo.blue.bold + '@' + repoLocation.yellow.bold + ':clean branch ' + 'COMMIT'.green.bold);
+        app.log.info(forkedRepo.blue.bold + '@' + repoLocation.yellow.bold + ':clean branch ' + 'COMMIT'.green.bold);
         return cb(null, 'OK');
       }
-  });
+    });
 }
 
 function pushCommit(forkedRepo, repoLocation, status, cb) {
-  if (status == 'DONE') {
+  if (status === 'DONE') {
     return cb(null, 'DONE');
   }
-  var gitDir= path.resolve(path.join(repoLocation,'.git')).toString();
+  var gitDir, cmd, child;
+  gitDir = path.resolve(path.join(repoLocation, '.git')).toString();
   app.log.info("Attempting a push commit on branch clean @" +  repoLocation.blue.bold);
-  var cmd = 'git --git-dir="' + gitDir + '" --work-tree="' + repoLocation  + '" push origin clean';
+  cmd = 'git --git-dir="' + gitDir + '" --work-tree="' + repoLocation  + '" push origin clean';
   app.log.debug('calling: "' + cmd.grey + '"');
-  var child = exec(cmd,
+  child = exec(cmd,
     function (error, stdout, stderr) {
       if (error !== null) {
         app.log.warn('pushCommit: ' + forkedRepo.blue.bold + ' ERROR DETECTED!'.red.bold);
@@ -415,57 +431,57 @@ function pushCommit(forkedRepo, repoLocation, status, cb) {
         console.dir(stdout);
         console.dir(stderr);
 
-        if (stdout == 'To prevent you from losing history, non-fast-forward updates were rejected\nMerge the remote changes before pushing again.  See the \'Note about\nfast-forwards\' section of \'git push --help\' for details.\n') {
+        if (stdout === 'To prevent you from losing history, non-fast-forward updates were rejected\nMerge the remote changes before pushing again.  See the \'Note about\nfast-forwards\' section of \'git push --help\' for details.\n') {
           app.log.warn(forkedRepo.blue.bold + '@' + repoLocation.yellow.bold + ':clean branch ' + 'COMMIT NOT PUSHED'.red.bold + ' : We may have already pushed to this fork!'.magenta.bold);
           return cb(null, 'DONE');
         } else {
           return cb(error);
         }
       } else {
-         app.log.info(forkedRepo.blue.bold + '@' + repoLocation.yellow.bold + ':clean branch ' + 'COMMIT PUSHED'.green.bold);
+        app.log.info(forkedRepo.blue.bold + '@' + repoLocation.yellow.bold + ':clean branch ' + 'COMMIT PUSHED'.green.bold);
         return cb(null, 'OK');
       }
-  });
+    });
 }
 
 function notifyAvailability(forkedRepo, username, repo, repoLocation, status, cb) {
-  var count    = 0;
-  var Available = false;
+  var count    = 0,
+      Available = false;
   async.until(// wait for availability (whilst)
       function () {
-        if (count % 2 === 0 ) {
+        if (count % 2 === 0) {
           app.log.info('Waiting for ' + username.magenta.bold + '/' + repo.yellow.bold + ' to become available...');
         }
         request.head(forkedRepo, function (error, response, body) {
-          if (!error && response.statusCode == 200) {
+          if (!error && response.statusCode === 200) {
             Available = true;
           }
         });
         return count > 300 || Available;
       },
-      function (cb) {
-          count ++ ;
+        function (cb) {
+          count++;
           setTimeout(cb, 2000);
-      },
+        },
       function (err) {
           // 5 minutes have passed
           if (count > 300) {
             app.log.error('Unable to find forked repo ' + username.magenta.bold + '/' + repo.yellow.bold + ' after 5 minutes.');
 
           } else {
-          app.log.info('Forked repo ' + username.magenta.bold + '/' + repo.yellow.bold + ' Exists!');
-          if (Available) {
-            return cb(null, 'DONE');//Change to 'DONE' if you dont want to clone
-          } else {
-            return cb("error: Timeout");
+            app.log.info('Forked repo ' + username.magenta.bold + '/' + repo.yellow.bold + ' Exists!');
+            if (Available) {
+              return cb(null, 'OK');//Change to 'DONE' if you dont want to clone
+            } else {
+              return cb("error: Timeout");
+            }
           }
         }
-      }
     );
 }
 
 function walkAndFix(link, status, cb) {
-  if (status == 'DONE') {
+  if (status === 'DONE') {
     return cb(null, 'DONE');
   }
   walk(link, function (err, results) {
@@ -473,13 +489,13 @@ function walkAndFix(link, status, cb) {
         return cb(err);
       }
 
-      async.map(results, doFileUpdate ,function (err, results) {
+      async.map(results, doFileUpdate, function (err, results) {
         if (err) {
           return cb(err);
         }
         //app.log.debug(results);
         //app.log.debug(results.indexOf('OK'));
-        if (results.indexOf('OK') == -1) {
+        if (results.indexOf('OK') === -1) {
           app.log.warn('No changes to make for '.bold.red + link.yellow);
           return cb(null, 'DONE');
         } else {
@@ -491,7 +507,7 @@ function walkAndFix(link, status, cb) {
 }
 
 function isNotOK(element, index, array) {
-  return (element != 'OK');
+  return (element !== 'OK');
 }
 
 function filterString(str) {
@@ -503,23 +519,24 @@ function filterString(str) {
 function walk(dir, done) {
   var results = [];
   fs.readdir(dir, function (err, list) {
-    if (err) { return done(err);}
+    var pending, modList;
+    if (err) { return done(err); }
 
-    var modList = list.filter(filterString);//filter out the undesirables
+    modList = list.filter(filterString);//filter out the undesirables
     list = modList;
-    var pending = list.length;
-    if (!pending) { return done(null, results);}
+    pending = list.length;
+    if (!pending) { return done(null, results); }
     list.forEach(function (file) {
-      file = path.resolve(path.join(dir,file));
+      file = path.resolve(path.join(dir, file));
       fs.stat(file, function (err, stat) {
         if (stat && stat.isDirectory()) {
           walk(file, function (err, res) {
             results = results.concat(res);
-            if (!--pending) { done(null, results);}
+            if (!--pending) { done(null, results); }
           });
         } else {
           results.push(file);
-          if (!--pending) { done(null, results);}
+          if (!--pending) { done(null, results); }
         }
       });
     });
@@ -541,14 +558,14 @@ function doFileUpdate(filename, cb) {
         replacement = "require('util')",
         replacementFull = "util = require('util')",
         replacementPart = 'util.',
-        dataStr = data.toString();
+        dataStr = data.toString(),
         fixedDoc = '';
 
     if (XRegExp.test(dataStr, re)) {
       if (XRegExp.test(dataStr, reFull)) {
         fixedDoc = XRegExp.replace(XRegExp.replace(dataStr, rePart, replacementPart, 'all'), reFull, replacementFull, 'all');
       }
-      else{
+      else {
         fixedDoc = XRegExp.replace(dataStr, re, replacement, 'all');
       }
       //return cb(null, fixedDoc);
@@ -561,10 +578,9 @@ function doFileUpdate(filename, cb) {
             app.log.info(filename.blue.bold + ' was modified and changed!');
             return cb(null, 'OK');
           }
-      });
+        });
 
-    }
-    else{
+    } else {
       app.log.debug('No ' + 'require("sys")'.magenta.bold + ' text found in ' + filename.blue.bold);
       return cb(null, 'NO CHANGE');
     }
