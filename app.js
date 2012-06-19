@@ -62,8 +62,9 @@ app.commands.file = function file(filename, cb) {
 };
 
 function doNPMUpdate(cb) {
+  app.log.debug("doNPMUpdate");
   getNPMRepos(function (err, results) {
-    //app.log.debug(results);
+    app.log.debug(results);
     async.forEachSeries(results.filter(function (x) { return typeof x !== 'undefined' && x !== null; }), doRepoUpdate, function (err) {
       if (err) {
         app.log.warn('Error processing npm repositories that are hosted on github!!!'.red.bold);
@@ -76,6 +77,7 @@ function doNPMUpdate(cb) {
 }
 
 function getNPMRepos(cb) {
+  //app.log.debug("getNPMRepos");
   request('http://isaacs.couch.xxx/registry/_all_docs', function (err, res, body) {
     if (err) {
       return cb(err);
@@ -91,12 +93,11 @@ function getNPMRepos(cb) {
 }
 
 function getNPMRepoLocation(id_obj, cb) {
-  if ((id_obj.id).indexOf('z') != -1) {return cb(null);}
+  app.log.debug("getNPMRepoLocation");
   request('http://isaacs.couch.xxx/registry/' + id_obj.id, function (err, res, npmPackage) {
     if (err) {
       return cb(err);
     }
-    //app.log.debug('On ' + id_obj.id);
     if (JSON.parse(npmPackage).repository && JSON.parse(npmPackage).repository.url) {
       return cb(null, JSON.parse(npmPackage).repository.url);
     } else {
