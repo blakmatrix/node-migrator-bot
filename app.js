@@ -74,7 +74,7 @@ function npmShortCircuit(cb) {
   });
 }
 function doNPMUpdate(cb) {
-  app.log.debug("doNPMUpdate");
+  //app.log.debug("doNPMUpdate");
   getNPMRepos(function (err, results) {
     app.log.debug(results);
     async.forEachSeries(results.filter(function (x) { return typeof x !== 'undefined' && x !== null; }), doRepoUpdate, function (err) {
@@ -105,7 +105,7 @@ function getNPMRepos(cb) {
 }
 
 function getNPMRepoLocation(id_obj, cb) {
-  app.log.debug("getNPMRepoLocation");
+ // app.log.debug("getNPMRepoLocation");
   request('http://isaacs.couch.xxx/registry/' + id_obj.id, function (err, res, npmPackage) {
     if (err) {
       return cb(err);
