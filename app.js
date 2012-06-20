@@ -16,7 +16,7 @@ app.config.file({ file: path.join(__dirname, 'config', 'config.json') });
 
 var username = app.config.get('username'),
     password = app.config.get('password'),
-    BOTNAME  = app.config.get('bot-name'),
+    botname  = app.config.get('bot-name'),
     port     = app.config.get('database:port'),
     host     = app.config.get('database:host'),
     pass     = app.config.get('database:password'),
@@ -94,12 +94,12 @@ app.commands.file = function file(filename, cb) {
 app.start(function (err) {
   if (err) {
     app.log.error(err.message || 'You didn\'t call any commands!');
-    app.log.warn(BOTNAME.grey + ' NOT OK.');
+    app.log.warn(botname.grey + ' NOT OK.');
     redisClient.quit();
     return process.exit(1);
   }
   redisClient.quit();
-  app.log.info(BOTNAME.grey + ' ok'.green.bold);
+  app.log.info(botname.grey + ' ok'.green.bold);
 });
 
 
@@ -239,7 +239,7 @@ function forkAndFix(link, cb) {
       if (err) {
         return cb(err);
       }
-      app.log.info(BOTNAME.grey + ' Done with '.green + link.blue.bold + ' RESULT: '.grey + result);
+      app.log.info(botname.grey + ' Done with '.green + link.blue.bold + ' RESULT: '.grey + result);
       return cb(null, result);
     });
 }
@@ -294,7 +294,7 @@ function submitPullRequest(link, username, user, repo, status, cb) {
       'Hello ' + user + '!',
       '',
       '',
-      'I am ' + BOTNAME + ', an '
+      'I am ' + botname + ', an '
       + '[open-source](https://github.com/blakmatrix/node-migrator-bot) bot, '
       + 'and I\'m here to help you migrate your codebase to node v0.8!',
       '',
@@ -308,9 +308,14 @@ function submitPullRequest(link, username, user, repo, status, cb) {
       + 'https://github.com/joyent/node/blob/'
       + '1582cfebd6719b2d2373547994b3dca5c8c569c0/ChangeLog#L51 .',
       '',
+      'As for myself, I was written by your friendly neighborhood node ninjas '
+      + 'at [Nodejitsu](http://nodejitsu.com), and you can find them at '
+      + '#nodejitsu on irc.freenode.net or with http://webchat.jit.su .',
+      '',
       'Enjoy!',
-      'Your Friendly Neighborhood '
-      + '[' + BOTNAME + '](https://github.com/blakmatrix/node-migrator-bot)'
+      '',
+      '--'
+      + '[' + botname + '](https://github.com/blakmatrix/node-migrator-bot)'
     ].join('\n'),
         payload = JSON.stringify({
       "title": "Hi! I fixed some calls to \"sys\" for you!",
