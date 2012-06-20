@@ -191,7 +191,7 @@ function doRepoUpdate(link, cb) {
         walkAndFix(null, link, 'OK', cb);//NOTE: LINKE HERE IS the path!!!
       }
     } else {
-      app.log.debug(link.yellow.bold + ' Has already been processed!');
+      app.log.info(link.yellow.bold + ' Has already been processed!');
       return cb(null, "DONE");
     }
   });
@@ -287,7 +287,7 @@ function submitPullRequest(link, username, user, repo, status, cb) {
     username: username,
     password: password
   }).login(['user', 'repo', 'gist'], function (err, id, token) {
-    app.log.info(id, token);//TODO: reuse tokens?
+    //app.log.info(id, token);//TODO: reuse tokens?
 
     var url = 'https://api.github.com/repos/' + user + '/' + repo + '/pulls?access_token=' + token,
         bodyMessage = [
@@ -295,7 +295,7 @@ function submitPullRequest(link, username, user, repo, status, cb) {
       '',
       '',
       'I am ' + BOTNAME + ', an '
-      + '[open-source](https://github.com/blakmatrix/node-migrator-bot) bot '
+      + '[open-source](https://github.com/blakmatrix/node-migrator-bot) bot, '
       + 'and I\'m here to help you migrate your codebase to node v0.8!',
       '',
       'Did you know that the "sys" module throws an error if your program '
@@ -500,7 +500,7 @@ function notifyAvailability(forkedRepo, username, repo, repoLocation, status, cb
           app.log.info('Waiting for ' + username.magenta.bold + '/' + repo.yellow.bold + ' to become available...');
         }
         request.head(forkedRepo, function (error, response, body) {
-          app.log.debug('notifyAvailability :: forkedRepo = ' + forkedRepo + ' | ' + 'response.statusCode = ' + response.statusCode);
+          //app.log.debug('notifyAvailability :: forkedRepo = ' + forkedRepo + ' | ' + 'response.statusCode = ' + response.statusCode);
           if (!error && response.statusCode === 200) {
             Available = true;
           }
