@@ -73,6 +73,7 @@ app.commands.repo = function file(link, cb) {
 app.commands.db = function file(cb) {
   redisClient.hgetall(npm_hash, function (err, obj) {
     console.dir(obj);
+    cb(null);
   });
 };
 
