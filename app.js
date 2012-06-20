@@ -16,7 +16,7 @@ app.config.file({ file: path.join(__dirname, 'config', 'config.json') });
 
 var username = app.config.get('username'),
     password = app.config.get('password'),
-    BOTNAME  = app.config.get('BOTNAME'),
+    BOTNAME  = app.config.get('bot-name'),
     port     = app.config.get('database:port'),
     host     = app.config.get('database:host'),
     pass     = app.config.get('database:password'),

@@ -2,7 +2,7 @@
   "name": "node-migrator-bot",
   "username":"node-migrator-bot",
   "password":"****",
-  "BOTNAME": "migrationBot",
+  "bot-name": "migrationBot",
   "database": {
     "port": 9241,
     "host": "koi.redistogo.com",
