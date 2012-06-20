@@ -12,6 +12,8 @@ var flatiron = require('flatiron'),
     password = 'XXXXXXXXXXXXX',
     app      = flatiron.app;
 
+Var BOTNAME = 'migrationBot';
+
 
 var gitQue = async.queue(function (task, callback) {
     app.log.info('GITQUE: Recieved New Task.'.cyan.bold);
@@ -130,7 +132,7 @@ function forkAndFix(link, cb){
       if (err) {
           return cb(err);
         }
-        app.log.info('node-migrator-bot'.grey+' Done with '.green+link.blue.bold+' RESULT: '.grey+result);
+        app.log.info(BOTNAME.grey+' Done with '.green+link.blue.bold+' RESULT: '.grey+result);
         return cb(null, result);
   });
 }
@@ -156,11 +158,7 @@ function submitPullRequest( username, user, repo, status, cb){
   if (status == 'DONE'){
     return cb(null, 'DONE');
   }
-  /*var client   = github.client({
-    username: username,
-    password: password
-  });
-  */
+
   github.auth.config({
     username: username,
     password: password
@@ -168,41 +166,36 @@ function submitPullRequest( username, user, repo, status, cb){
     app.log.info(id, token);//TODO: reuse tokens?
 
     url = 'https://api.github.com/repos/' + user + '/' + repo + '/pulls?access_token='+token;
-    var foo = 'Hi';
-    var bodyMessage = 'Hello '+user+',\n\nI am the node-migrator-bot, I am an '+
-      '[open-source](https://github.com/blakmatrix/node-migrator-bot) robot '+
-      'that will make changes to your code to hopefully fix the issue that '+
-      'arises when you have require(\'sys\') in your code when running against '+
-      'v 0.8+ versions of node. I will change your code to reflect the proper'+
-      ' library \'util\'.\n\nIf you would like to know more take a look at '+
-      'https://github.com/joyent/node/commit/1582cf#L1R51 or '+
-      'https://github.com/joyent/node/blob/1582cfebd6719b2d2373547994b3dca5c8c569c0/ChangeLog#L51'+
-      '\n\nThanks!\nYour Friendly Neighborhood '+
-      '[node-migrator-bot](https://github.com/blakmatrix/node-migrator-bot)';
-    var payload = '{\n'+
-          '"title": "Hi! I migrated your code for you!",\n'+
-          '"body": '+JSON.stringify(bodyMessage)+',\n'+
-          '"base": "master",\n'+
-          '"head": "'+username+':clean"\n'+
-        '}';
 
-    /*client.repo(username+'/'+repo).create_pull_request_comment(
-      'id',
-      {
-        title: 'Hi! I migrated your code for you!',
-        body: JSON.stringify(bodyMessage),
-        base: 'master',
-        head: username+':clean'
-      },
-      function (err, data){
-      if (err){
-        app.log.error('error: '+err);
-        app.log.error('data:  '+data);
-        cb(err);
-      }else{
-        return cb(null, 'done');
-      }
-    });*/
+    var bodyMessage = [
+      'Hello ' + user + '!',
+      '',
+      '',
+      'I am ' + BOTNAME + ', an '
+      + '[open-source](https://github.com/blakmatrix/node-migrator-bot) bot '
+      + 'and I\'m here to help you migrate your codebase to node v0.8!',
+      '',
+      'Did you know that the "sys" module throws an error if your program '
+      + 'tries to require it in node v0.8? To help keep your code running, '
+      + 'I automatically replaced `var sys = require(\'sys\')` with '
+      + '`var util = require(\'util\')`.',
+      '',
+      'If you\'d like to know more about these changes in node.js, take a look '
+      + 'at https://github.com/joyent/node/commit/1582cf#L1R51 and '
+      + 'https://github.com/joyent/node/blob/'
+      + '1582cfebd6719b2d2373547994b3dca5c8c569c0/ChangeLog#L51 .',
+      '',
+      'Enjoy!',
+      'Your Friendly Neighborhood '
+      + '[' + BOTNAME + '](https://github.com/blakmatrix/node-migrator-bot)'
+    ].join('\n');
+    var payload = JSON.stringify({
+      "title": "Hi! I fixed some calls to \"sys\" for you!",
+      "body": bodyMessage,
+      "base": "master",
+      "head": username + ":clean"
+    });
+
     app.log.debug('Attempting to make Pull Request to:\n'+url.green+' with the following payload:\n\n '+payload.cyan.bold);
     request.post({url:url, body: payload}, function (error, response, body) {
             if (!error && response.statusCode == 201) {//Status: 201 Created
@@ -298,7 +291,7 @@ function commitRepo(forkedRepo, repoLocation, status, cb){
   if (status == 'DONE'){
     return cb(null, 'DONE');
   }
-  var message = "[fix] Changed require('sys') to require('util') for migration issues";
+  var message = "[fix] Changed require('sys') to require('util') for compatibility with node v0.8";
   var gitDir= path.resolve(path.join(repoLocation,'.git')).toString();
   app.log.info("Attempting a commit on "+ repoLocation.blue.bold);
   var cmd = 'git --git-dir="'+gitDir+'" --work-tree="'+repoLocation +'" commit -am "'+message+'"';
