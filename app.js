@@ -9,9 +9,26 @@ var flatiron = require('flatiron'),
     util     = require('util'),
     rimraf   = require('rimraf'),
     exec     = require('child_process').exec,
-    username = 'XXXXXXXXXXXXX',
-    password = 'XXXXXXXXXXXXX',
+    redis    = require("redis"),
     app      = flatiron.app;
+
+app.config.file({ file: path.join(__dirname, 'config', 'config.json') });
+
+var username = app.config.get('username'),
+    password = app.config.get('password'),
+    port     = app.config.get('database:port'),
+    host     = app.config.get('database:host'),
+    pass     = app.config.get('database:password'),
+    npm_hash = app.config.get('database:npm_hash');
+
+var redisClient = redis.createClient(port, host);
+
+redisClient.auth(pass, function (err) {
+  if (err) {
+    throw err;
+  }
+  app.log.info("REDIS Authed!");
+});
 
 
 var gitQue = async.queue(function (task, callback) {
@@ -19,8 +36,15 @@ var gitQue = async.queue(function (task, callback) {
     callback(null, task);
   }, 1);
 
+redisClient.on("error", function (err) {
+  app.log.error("REDIS Error " + err);
+});
 
-app.config.file({ file: path.join(__dirname, 'config', 'config.json') });
+redisClient.on("quit", function (err) {
+  app.log.error("REDIS Shutting down");
+});
+
+
 
 app.use(flatiron.plugins.cli, {
   source: path.join(__dirname, 'lib', 'commands'),
@@ -46,6 +70,12 @@ app.commands.repo = function file(link, cb) {
   doRepoUpdate(link, cb);
 };
 
+app.commands.db = function file(cb) {
+  redisClient.hgetall(npm_hash, function (err, obj) {
+    console.dir(obj);
+  });
+};
+
 app.commands.npm = function file(link, cb) {
   this.log.warn('Running on all available npm repositories that are hosted on github!!!'.red.bold);
   doNPMUpdate(cb);
@@ -62,17 +92,21 @@ app.commands.file = function file(filename, cb) {
   doFileUpdate(filename, cb);
 };
 
-function npmShortCircuit(cb) {
-  var ex = ['git://github.com/eller86/surrogate-pair.js.git', 'git://github.com/vesln/surround.git', 'git@github.com:sebv/sv-cake-utils.git'];
-  async.forEachSeries(ex, doRepoUpdate, function (err) {
-    if (err) {
-      app.log.warn('Error processing npm repositories that are hosted on github!!!'.red.bold);
-      return cb(err);
-    } else {
-      return cb(null, 'OK');
-    }
-  });
-}
+app.start(function (err) {
+  if (err) {
+    app.log.error(err.message || 'You didn\'t call any commands!');
+    app.log.warn('node-migrator-bot'.grey + ' NOT OK.');
+    redisClient.quit();
+    return process.exit(1);
+  }
+  redisClient.quit();
+  app.log.info('node-migrator-bot'.grey + ' ok'.green.bold);
+});
+
+
+
+
+
 function doNPMUpdate(cb) {
   //app.log.debug("doNPMUpdate");
   getNPMRepos(function (err, results) {
@@ -143,13 +177,25 @@ function doRepoUpdate(link, cb) {
   var re = /(http|ftp|https|git|file):\/\/(\/)?[\w\-]+(\.[\w\-]+)+([\w.,@?\^=%&amp;:\/~+#\-]*[\w@?\^=%&amp;\/~+#\-])?/gi,
    reSSH = /git@github\.com:.*\/.*(\.git$|$)/g;
 
-  if (XRegExp.test(link, re) || XRegExp.test(link, reSSH)) {
-    app.log.info(link.blue.bold + ' is a url');
-    forkAndFix(link, cb);
-  } else {
-    app.log.info(link.blue.bold + ' is a folder');
-    walkAndFix(link, 'OK', cb);
-  }
+  redisClient.hget(npm_hash, link, function (err, hashk_value) {
+    if (err) {
+      app.log.error('There was a problem with finding the value of ' + npm_hash + ':' + link);
+      return cb(err);
+    }
+
+    if (hashk_value === null) {
+      if (XRegExp.test(link, re) || XRegExp.test(link, reSSH)) {
+        app.log.info(link.blue.bold + ' is a url');
+        forkAndFix(link, cb);
+      } else {
+        app.log.info(link.blue.bold + ' is a folder');
+        walkAndFix(null, link, 'OK', cb);//NOTE: LINKE HERE IS the path!!!
+      }
+    } else {
+      app.log.debug(link.yellow.bold + ' Has already been processed!');
+      return cb(null, "DONE");
+    }
+  });
 }
 
 function forkAndFix(link, cb) {
@@ -163,7 +209,7 @@ function forkAndFix(link, cb) {
   app.log.info('Forking ' + user.magenta.bold + '/' + repo.yellow.bold);
   async.waterfall([
     function (callback) {
-      forkRepo(forkedRepo, username, user, repo, repoLocation, callback);
+      forkRepo(link, forkedRepo, username, user, repo, repoLocation, callback);
     },//fork
     function (status, callback) {
       notifyAvailability(forkedRepo, username, repo, repoLocation, status, callback);
@@ -175,16 +221,16 @@ function forkAndFix(link, cb) {
       gitQue.push({task: switchBranch(forkedRepo, repoLocation, status, callback), info: 'git:switchBranch :: ' + forkedRepo});
     },// switch branch
     function (status, callback) {
-      walkAndFix(repoLocation, status, callback);//? lose all variables?
+      walkAndFix(link, repoLocation, status, callback);//? lose all variables?
     },// walkAndFix
     function (status, callback) {
-      gitQue.push({task: commitRepo(forkedRepo, repoLocation, status, callback), info: '  git:commitRepo :: ' + forkedRepo});
+      gitQue.push({task: commitRepo(link, forkedRepo, repoLocation, status, callback), info: '  git:commitRepo :: ' + forkedRepo});
     },// commit
     function (status, callback) {
       gitQue.push({task: pushCommit(forkedRepo, repoLocation, status, callback), info: '  git:pushCommit :: ' + forkedRepo});
     },// push
     function (status, callback) {
-      submitPullRequest(username, user, repo, status, callback);
+      submitPullRequest(link, username, user, repo, status, callback);
     },// submit pull request
     function (status, callback) {
       cleanUpFileSystem(repoLocation, callback);
@@ -217,7 +263,7 @@ function cleanUpFileSystem(repoLocation, cb) {
   });
 }
 
-function forkRepo(forkedRepo, username, user, repo, repoLocation, cb) {
+function forkRepo(link, forkedRepo, username, user, repo, repoLocation, cb) {
   var client   = github.client({
     username: username,
     password: password
@@ -225,8 +271,8 @@ function forkRepo(forkedRepo, username, user, repo, repoLocation, cb) {
 
   client.me().fork(user + '/' + repo, function (err, data) {
     if (err) {
-      app.log.error('error: ' + err);
-      app.log.error('data:  ' + data);
+      app.log.error(err + ' ' + link.yellow.bold);
+      app.log.debug('data:  ' + data);
       return cb(err);
     } else {
       return cb(null, 'OK');
@@ -234,7 +280,7 @@ function forkRepo(forkedRepo, username, user, repo, repoLocation, cb) {
   });
 }
 
-function submitPullRequest(username, user, repo, status, cb) {
+function submitPullRequest(link, username, user, repo, status, cb) {
   if (status === 'DONE') {
     return cb(null, 'DONE');
   }
@@ -288,17 +334,16 @@ function submitPullRequest(username, user, repo, status, cb) {
     request.post({url: url, body: payload}, function (error, response, body) {
             if (!error && response.statusCode === 201) {//Status: 201 Created
               app.log.info('Pull Request to ' + user + '/' + repo + ' from ' + username + '/' + repo + ' Succesfull!');
+              redisClient.hset(npm_hash, link, 'processed');
+
               return cb(null, 'DONE');
             } else {
-              //app.log.debug('response:');
-              //app.log.debug(response.statusCode);
-              //app.log.debug(response.body);
-              app.log.error('error: ' + error);
               if (error === null) {
                 try {
                   throw new Error(response.statusCode + ' ' + response.body.toString());
                 }catch (err) {
-                  cb(err);
+                  app.log.error('submitPullRequest::error : ' + err);
+                  return cb(null, 'DONE');
                 }
               } else {
                 return cb(error);
@@ -383,7 +428,7 @@ function switchBranch(forkedRepo, repoLocation, status, cb) {
     });
 }
 
-function commitRepo(forkedRepo, repoLocation, status, cb) {
+function commitRepo(link, forkedRepo, repoLocation, status, cb) {
 
   if (status === 'DONE') {
     return cb(null, 'DONE');
@@ -403,6 +448,7 @@ function commitRepo(forkedRepo, repoLocation, status, cb) {
         console.dir(stderr);
         if (stdout === '# On branch clean\nnothing to commit (working directory clean)\n') {
           app.log.info(forkedRepo.blue.bold + '@' + repoLocation.yellow.bold + ':clean branch ' + 'NOTHING TO COMMIT'.red.bold);
+          redisClient.hset(npm_hash, link, 'processed');
           return cb(null, 'DONE');
         } else {
           return cb(error);
@@ -433,7 +479,7 @@ function pushCommit(forkedRepo, repoLocation, status, cb) {
 
         if (stdout === 'To prevent you from losing history, non-fast-forward updates were rejected\nMerge the remote changes before pushing again.  See the \'Note about\nfast-forwards\' section of \'git push --help\' for details.\n') {
           app.log.warn(forkedRepo.blue.bold + '@' + repoLocation.yellow.bold + ':clean branch ' + 'COMMIT NOT PUSHED'.red.bold + ' : We may have already pushed to this fork!'.magenta.bold);
-          return cb(null, 'DONE');
+          return cb(null, 'OK');
         } else {
           return cb(error);
         }
@@ -453,6 +499,7 @@ function notifyAvailability(forkedRepo, username, repo, repoLocation, status, cb
           app.log.info('Waiting for ' + username.magenta.bold + '/' + repo.yellow.bold + ' to become available...');
         }
         request.head(forkedRepo, function (error, response, body) {
+          app.log.debug('notifyAvailability :: forkedRepo = ' + forkedRepo + ' | ' + 'response.statusCode = ' + response.statusCode);
           if (!error && response.statusCode === 200) {
             Available = true;
           }
@@ -480,11 +527,11 @@ function notifyAvailability(forkedRepo, username, repo, repoLocation, status, cb
     );
 }
 
-function walkAndFix(link, status, cb) {
+function walkAndFix(link, repoLocation, status, cb) {
   if (status === 'DONE') {
     return cb(null, 'DONE');
   }
-  walk(link, function (err, results) {
+  walk(repoLocation, function (err, results) {
       if (err) {
         return cb(err);
       }
@@ -496,7 +543,8 @@ function walkAndFix(link, status, cb) {
         //app.log.debug(results);
         //app.log.debug(results.indexOf('OK'));
         if (results.indexOf('OK') === -1) {
-          app.log.warn('No changes to make for '.bold.red + link.yellow);
+          app.log.warn('No changes to make for '.bold.red + repoLocation.yellow);
+          redisClient.hset(npm_hash, link, 'processed');
           return cb(null, 'DONE');
         } else {
           return cb(null, 'OK');
@@ -587,12 +635,5 @@ function doFileUpdate(filename, cb) {
   });
 }
 
-app.start(function (err) {
-  if (err) {
-    app.log.error(err.message || 'You didn"t call any commands!');
-    app.log.warn('node-migrator-bot'.grey + ' NOT OK.');
-    return process.exit(1);
-  }
-  app.log.info('node-migrator-bot'.grey + ' ok'.green.bold);
-});
+
 

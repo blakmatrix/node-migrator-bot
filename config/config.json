@@ -1,2 +1,11 @@
 {
+  "name": "node-migrator-bot",
+  "username":"node-migrator-bot",
+  "password":"****",
+  "database": {
+    "port": 9241,
+    "host": "koi.redistogo.com",
+    "password": "****",
+    "npm_hash": "npm_june_2012"
+  }
 }

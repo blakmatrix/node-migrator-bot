@@ -9,7 +9,8 @@
     "async": "~0.1.22",
     "request": "~2.9.202",
     "octonode": "~0.2.0",
-    "rimraf": "~2.0.2"
+    "rimraf": "~2.0.2",
+    "redis": "~0.7.2"
   },
   "devDependencies": {
     "cli-easy": "0.1.0",
