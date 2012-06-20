@@ -435,7 +435,7 @@ function commitRepo(link, forkedRepo, repoLocation, status, cb) {
     return cb(null, 'DONE');
   }
   var gitDir, cmd, child, message;
-  message = "[fix] Changed require('sys') to require('util') for compatibility with node v0.8";
+  message = "[fix] Changed require('util') to require('util') for compatibility with node v0.8";
   gitDir = path.resolve(path.join(repoLocation, '.git')).toString();
   app.log.info("Attempting a commit on " +  repoLocation.blue.bold);
   cmd = 'git --git-dir="' + gitDir + '" --work-tree="' + repoLocation  + '" commit -am "' + message + '"';
@@ -630,7 +630,7 @@ function doFileUpdate(filename, cb) {
         });
 
     } else {
-      app.log.debug('No ' + 'require("sys")'.magenta.bold + ' text found in ' + filename.blue.bold);
+      app.log.debug('No ' + 'require('util')'.magenta.bold + ' text found in ' + filename.blue.bold);
       return cb(null, 'NO CHANGE');
     }
   });
