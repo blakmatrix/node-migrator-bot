@@ -16,10 +16,10 @@ at https://github.com/joyent/node/commit/1582cf#L1R51 and
 https://github.com/joyent/node/blob/1582cfebd6719b2d2373547994b3dca5c8c569c0/ChangeLog#L51 .  
 
 As for myself, I was written by your friendly neighborhood node ninjas 
-at [Nodejitsu](http://nodejitsu.com), and you can find them at 
-#nodejitsu on irc.freenode.net or with http://webchat.jit.su .  
+at [Nodejitsu](http://nodejitsu.com), and you can find them at `#nodejitsu` 
+on irc.freenode.net or with http://webchat.jit.su .  
 
-Enjoy!,
+Enjoy!,  
 --node-migrator-bot
 
 
