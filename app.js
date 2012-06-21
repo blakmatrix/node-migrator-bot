@@ -10,8 +10,7 @@ var flatiron = require('flatiron'),
     rimraf   = require('rimraf'),
     exec     = require('child_process').exec,
     redis    = require("redis"),
-    app      = flatiron.app,
-    redisClient = redis.createClient();
+    app      = flatiron.app;
 
 app.config.file({ file: path.join(__dirname, 'config', 'config.json') });
 
@@ -23,13 +22,25 @@ var username = app.config.get('username'),
     pass     = app.config.get('database:password'),
     npm_hash = app.config.get('database:npm_hash');
 
+var redisClient = redis.createClient(port, host);
 
+redisClient.auth(pass, function (err) {
+  if (err) {
+    throw err;
+  }
+  app.log.info("REDIS Authed!");
+});
 
 
 var gitQue = async.queue(function (task, callback) {
     app.log.debug('GITQUE:'.cyan.bold + ' Running '.green.bold + task["info"].toString().magenta);
     callback(null, task);
   }, 1);
+
+redisClient.on("error", function (err) {
+  app.log.error("REDIS " + err.message);
+  //return process.exit(1);
+});
 
 
 
@@ -58,76 +69,22 @@ app.use(flatiron.plugins.cli, {
 
 app.commands.repo = function repo(link, cb) {
   this.log.info('Attempting to open path"' + link + '"');
-  async.waterfall([
-    function (callback) {
-      initRedis(callback);
-    },//fork
-    function (callback) {
-      doRepoUpdate(link, callback);
-    }
-  ],
-    function (err, result) {//callback
-      if (err) {
-        return cb(err);
-      }
-      return cb(null, result);
-    });
+  doRepoUpdate(link, cb);
 };
 
 app.commands.db = function db(cb) {
-  async.waterfall([
-    function (callback) {
-      initRedis(callback);
-    },//fork
-    function (callback) {
-      redisClient.hgetall(npm_hash, function (err, obj) {
-        console.dir(obj);
-        callback(null);
-      });
-    }
-  ],
-    function (err, result) {//callback
-      if (err) {
-        return cb(err);
-      }
-      return cb(null, result);
-    });
+  this.log.info('Getting processed items in DB...');
+  getDBinfo(cb);
 };
 
 app.commands.npm = function npm(link, cb) {
   this.log.warn('Running on all available npm repositories that are hosted on github!!!'.red.bold);
-  async.waterfall([
-    function (callback) {
-      initRedis(callback);
-    },//fork
-    function (callback) {
-      doNPMUpdate(link, callback);
-    }
-  ],
-    function (err, result) {//callback
-      if (err) {
-        return cb(err);
-      }
-      return cb(null, result);
-    });
+  doNPMUpdate(cb);
 };
 
 app.commands.user = function user(user, cb) {
   this.log.info('Attempting get information on "' + user + '"');
-  async.waterfall([
-    function (callback) {
-      initRedis(callback);
-    },//fork
-    function (callback) {
-      doUserRepoUpdateStart(user, callback);
-    }
-  ],
-    function (err, result) {//callback
-      if (err) {
-        return cb(err);
-      }
-      return cb(null, result);
-    });
+  doUserRepoUpdateStart(user, cb);
 };
 
 app.commands.file = function file(filename, cb) {
@@ -147,23 +104,19 @@ app.start(function (err) {
 });
 
 
-function initRedis(cb) {
-  redisClient = redis.createClient(port, host);
-  redisClient.on("error", function (err) {
-    app.log.error("REDIS " + err.message);
-  });
 
-  redisClient.auth(pass, function (err) {
-    if (err) {
-      cb(err);
-    }
-    app.log.info("REDIS Authed!");
+
+
+function getDBinfo(cb) {
+  redisClient.hgetall(npm_hash, function (err, data) {
+    console.dir(data);
+    //app.log.info(data);
     cb(null);
+
   });
 }
 
 function doNPMUpdate(cb) {
-  //app.log.debug("doNPMUpdate");
   getNPMRepos(function (err, results) {
     app.log.debug(results);
     async.forEachSeries(results.filter(function (x) { return typeof x !== 'undefined' && x !== null; }), doRepoUpdate, function (err) {
@@ -178,7 +131,6 @@ function doNPMUpdate(cb) {
 }
 
 function getNPMRepos(cb) {
-  //app.log.debug("getNPMRepos");
   request('http://isaacs.couch.xxx/registry/_all_docs', function (err, res, body) {
     if (err) {
       return cb(err);
@@ -194,7 +146,6 @@ function getNPMRepos(cb) {
 }
 
 function getNPMRepoLocation(id_obj, cb) {
- // app.log.debug("getNPMRepoLocation");
   request('http://isaacs.couch.xxx/registry/' + id_obj.id, function (err, res, npmPackage) {
     if (err) {
       return cb(err);
@@ -268,7 +219,7 @@ function forkAndFix(link, cb) {
     },//fork
     function (status, callback) {
       notifyAvailability(forkedRepo, username, repo, repoLocation, status, callback);
-    },//,// wait for availability (whilst)
+    },//,// wait for availability
     function (status, callback) {
       gitQue.push({task: cloneRepo(repo, forkedRepo, repoLocation, status, callback), info: '   git:cloneRepo :: ' + forkedRepo});
     },// clone repo
@@ -276,7 +227,7 @@ function forkAndFix(link, cb) {
       gitQue.push({task: switchBranch(forkedRepo, repoLocation, status, callback), info: 'git:switchBranch :: ' + forkedRepo});
     },// switch branch
     function (status, callback) {
-      walkAndFix(link, repoLocation, status, callback);//? lose all variables?
+      walkAndFix(link, repoLocation, status, callback);
     },// walkAndFix
     function (status, callback) {
       gitQue.push({task: commitRepo(link, forkedRepo, repoLocation, status, callback), info: '  git:commitRepo :: ' + forkedRepo});
@@ -422,8 +373,6 @@ function cloneRepo(repo, forkedRepo, repoLocation, status, cb) {
   }
   var cmd, child;
   app.log.info("Attempting to clone " +  forkedRepo.blue.bold);
-  //ssh git@github.com:username/repo.git
-  //var cmd = 'git clone ' + forkedRepo + '.git "' + repoLocation + '"';
   cmd = 'git clone git@github.com:' + username + '/' + repo + '.git "' + repoLocation + '"';
   app.log.debug('calling: "' + cmd.grey + '"');
   child = exec(cmd,
@@ -498,7 +447,7 @@ function commitRepo(link, forkedRepo, repoLocation, status, cb) {
   var gitDir, cmd, child, message;
   message = "[fix] Changed require('sys') to require('util') for compatibility with node v0.8";
   gitDir = path.resolve(path.join(repoLocation, '.git')).toString();
-  app.log.info("Attempting a commit on " +  repoLocation.blue.bold);
+  app.log.info("Attempting a commit on " +  repoLocation.yellow.bold);
   cmd = 'git --git-dir="' + gitDir + '" --work-tree="' + repoLocation  + '" commit -am "' + message + '"';
   app.log.debug('calling: "' + cmd.grey + '"');
   child = exec(cmd,
@@ -528,7 +477,7 @@ function pushCommit(forkedRepo, repoLocation, status, cb) {
   }
   var gitDir, cmd, child;
   gitDir = path.resolve(path.join(repoLocation, '.git')).toString();
-  app.log.info("Attempting a push commit on branch clean @" +  repoLocation.blue.bold);
+  app.log.info("Attempting a push commit on branch clean @" +  repoLocation.yellow.bold);
   cmd = 'git --git-dir="' + gitDir + '" --work-tree="' + repoLocation  + '" push origin clean';
   app.log.debug('calling: "' + cmd.grey + '"');
   child = exec(cmd,
@@ -555,7 +504,7 @@ function pushCommit(forkedRepo, repoLocation, status, cb) {
 function notifyAvailability(forkedRepo, username, repo, repoLocation, status, cb) {
   var count    = 0,
       Available = false;
-  async.until(// wait for availability (whilst)
+  async.until(// wait for availability
       function () {
         if (count % 2 === 0) {
           app.log.info('Waiting for ' + username.magenta.bold + '/' + repo.yellow.bold + ' to become available...');
@@ -602,8 +551,7 @@ function walkAndFix(link, repoLocation, status, cb) {
         if (err) {
           return cb(err);
         }
-        //app.log.debug(results);
-        //app.log.debug(results.indexOf('OK'));
+
         if (results.indexOf('OK') === -1) {
           app.log.warn('No changes to make for '.bold.red + repoLocation.yellow);
           redisClient.hset(npm_hash, link, 'processed');
@@ -659,8 +607,6 @@ function doFileUpdate(filename, cb) {
       return cb(err);
     }
 
-    //app.log.info(data);
-    //app.log.info("Regex");
 
     var re = /require\s*\(\s*['"]sys['"]\s*\)/g,
         reFull = /sys\s*=\s*require\s*\(\s*['"]sys['"]\s*\)/g,
@@ -678,20 +624,19 @@ function doFileUpdate(filename, cb) {
       else {
         fixedDoc = XRegExp.replace(dataStr, re, replacement, 'all');
       }
-      //return cb(null, fixedDoc);
       // write changes out to file
       fs.writeFile(filename, fixedDoc, function (err) {
           if (err) {
             app.log.error('The file was not saved');
             return cb(err);
           } else {
-            app.log.info(filename.blue.bold + ' was modified and changed!');
+            app.log.info(filename.yellow.bold + ' was modified and changed!'.inverse.green);
             return cb(null, 'OK');
           }
         });
 
     } else {
-      app.log.debug('No ' + 'require("sys")'.magenta.bold + ' text found in ' + filename.blue.bold);
+      app.log.debug('No ' + 'require("sys")'.magenta.bold + ' text found in ' + filename.yellow.bold);
       return cb(null, 'NO CHANGE');
     }
   });
