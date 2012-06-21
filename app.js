@@ -10,7 +10,8 @@ var flatiron = require('flatiron'),
     rimraf   = require('rimraf'),
     exec     = require('child_process').exec,
     redis    = require("redis"),
-    app      = flatiron.app;
+    app      = flatiron.app,
+    redisClient = redis.createClient();
 
 app.config.file({ file: path.join(__dirname, 'config', 'config.json') });
 
@@ -22,25 +23,13 @@ var username = app.config.get('username'),
     pass     = app.config.get('database:password'),
     npm_hash = app.config.get('database:npm_hash');
 
-var redisClient = redis.createClient(port, host);
 
-redisClient.auth(pass, function (err) {
-  if (err) {
-    throw err;
-  }
-  app.log.info("REDIS Authed!");
-});
 
 
 var gitQue = async.queue(function (task, callback) {
     app.log.debug('GITQUE:'.cyan.bold + ' Running '.green.bold + task["info"].toString().magenta);
     callback(null, task);
   }, 1);
-
-redisClient.on("error", function (err) {
-  app.log.error("REDIS " + err.message);
-  //return process.exit(1);
-});
 
 
 
@@ -59,31 +48,86 @@ app.use(flatiron.plugins.cli, {
     '    node-migrator-bot user <user>   - Takes a github username, forks all node.js',
     '                                      repositories, does its thing, then',
     '                                      initates a pull request on each repository',
-    '    node-migrator-bot file <file>   - runs the bot on the file provided'
+    '    node-migrator-bot file <file>   - runs the bot on the file provided',
+    '    node-migrator-bot npm           - runs the bot on npm packages with repos on ',
+    '                                      github',
+    '    node-migrator-bot db            - displays all the processed repos in the db',
+    '    node-migrator-bot use           - You\'re looking at it!'
   ]
 });
 
-app.commands.repo = function file(link, cb) {
+app.commands.repo = function repo(link, cb) {
   this.log.info('Attempting to open path"' + link + '"');
-  doRepoUpdate(link, cb);
+  async.waterfall([
+    function (callback) {
+      initRedis(callback);
+    },//fork
+    function (callback) {
+      doRepoUpdate(link, callback);
+    }
+  ],
+    function (err, result) {//callback
+      if (err) {
+        return cb(err);
+      }
+      return cb(null, result);
+    });
 };
 
-app.commands.db = function file(cb) {
-  redisClient.hgetall(npm_hash, function (err, obj) {
-    console.dir(obj);
-    cb(null);
-  });
+app.commands.db = function db(cb) {
+  async.waterfall([
+    function (callback) {
+      initRedis(callback);
+    },//fork
+    function (callback) {
+      redisClient.hgetall(npm_hash, function (err, obj) {
+        console.dir(obj);
+        callback(null);
+      });
+    }
+  ],
+    function (err, result) {//callback
+      if (err) {
+        return cb(err);
+      }
+      return cb(null, result);
+    });
 };
 
-app.commands.npm = function file(link, cb) {
+app.commands.npm = function npm(link, cb) {
   this.log.warn('Running on all available npm repositories that are hosted on github!!!'.red.bold);
-  doNPMUpdate(cb);
-  //npmShortCircuit(cb);
+  async.waterfall([
+    function (callback) {
+      initRedis(callback);
+    },//fork
+    function (callback) {
+      doNPMUpdate(link, callback);
+    }
+  ],
+    function (err, result) {//callback
+      if (err) {
+        return cb(err);
+      }
+      return cb(null, result);
+    });
 };
 
-app.commands.user = function file(user, cb) {
+app.commands.user = function user(user, cb) {
   this.log.info('Attempting get information on "' + user + '"');
-  doUserRepoUpdateStart(user, cb);
+  async.waterfall([
+    function (callback) {
+      initRedis(callback);
+    },//fork
+    function (callback) {
+      doUserRepoUpdateStart(user, callback);
+    }
+  ],
+    function (err, result) {//callback
+      if (err) {
+        return cb(err);
+      }
+      return cb(null, result);
+    });
 };
 
 app.commands.file = function file(filename, cb) {
@@ -93,7 +137,7 @@ app.commands.file = function file(filename, cb) {
 
 app.start(function (err) {
   if (err) {
-    app.log.error(err.message || 'You didn\'t call any commands!');
+    app.log.error(err.message || 'You didn\'t call any commands! Type <app> use to see use cases');
     app.log.warn(botname.grey + ' NOT OK.');
     redisClient.quit();
     return process.exit(1);
@@ -103,8 +147,20 @@ app.start(function (err) {
 });
 
 
+function initRedis(cb) {
+  redisClient = redis.createClient(port, host);
+  redisClient.on("error", function (err) {
+    app.log.error("REDIS " + err.message);
+  });
 
-
+  redisClient.auth(pass, function (err) {
+    if (err) {
+      cb(err);
+    }
+    app.log.info("REDIS Authed!");
+    cb(null);
+  });
+}
 
 function doNPMUpdate(cb) {
   //app.log.debug("doNPMUpdate");
