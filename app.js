@@ -72,6 +72,11 @@ app.commands.repo = function repo(link, cb) {
   doRepoUpdate(link, cb);
 };
 
+app.commands.delrepo = function delRepo(repo, cb) {
+  this.log.info('Attempting to open delete "' + username + '/' + repo + '"');
+  deleteRepo(repo, 'OK', cb);
+};
+
 app.commands.db = function db(cb) {
   this.log.info('Getting processed items in DB...');
   getDBinfo(cb);
@@ -160,6 +165,8 @@ function getNPMRepoLocation(id_obj, cb) {
   });
 }
 
+
+
 function doUserRepoUpdateStart(user, cb) {
   var client   = github.client();
   app.log.info('Getting ' + user.red.bold + '\'s list of Repositories...');
@@ -238,6 +245,9 @@ function forkAndFix(link, cb) {
     function (status, callback) {
       submitPullRequest(link, username, user, repo, status, callback);
     },// submit pull request
+    function (repo, status, callback) {
+      deleteRepo(repo, status, callback);
+    },// delete forked repo if there is not a pull request to make
     function (status, callback) {
       cleanUpFileSystem(repoLocation, callback);
     }//clean up filesystem
@@ -349,7 +359,7 @@ function submitPullRequest(link, username, user, repo, status, cb) {
               app.log.info('Pull Request to ' + user + '/' + repo + ' from ' + username + '/' + repo + ' Succesfull!');
               redisClient.hset(npm_hash, link, 'processed');
 
-              return cb(null, 'DONE');
+              return cb(null, 'OK');
             } else {
               if (error === null) {
                 try {
@@ -599,6 +609,35 @@ function walk(dir, done) {
       });
     });
   });
+}
+
+function deleteRepo(repo, status, cb) {
+  if (status === 'DONE') {
+
+    var client = github.client({
+      username: username,
+      password: password
+    });
+    var endpoint = '/repos/' + username + '/' + repo;
+
+    client.del(endpoint, {},  function (err, status, body) {
+      if (err) {
+        app.log.error('Could not delete ' + endpoint.blue + ' : ' + body);
+        //return cb({message: err + ' ' + endpoint});
+      }
+      if (status === 204) { //Status: 204 No Content
+        app.log.info('Succesfully deleted ' + endpoint.blue);
+        return cb(null, 'OK');
+      } else {
+        app.log.error('Could not delete ' + endpoint.blue + ' : ' + body);
+        return cb({message: endpoint + ' ' + body});
+      }
+    });
+  } else {
+    app.log.warn('Did not delete ' + repo.blue);
+    cb(null, 'OK');
+  }
+
 }
 
 function doFileUpdate(filename, cb) {
