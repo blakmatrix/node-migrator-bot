@@ -74,7 +74,7 @@ app.commands.repo = function repo(link, cb) {
 
 app.commands.delrepo = function delRepo(repo, cb) {
   this.log.info('Attempting to open delete "' + username + '/' + repo + '"');
-  deleteRepo(repo, 'OK', cb);
+  deleteRepo(repo, 'DONE', cb);
 };
 
 app.commands.db = function db(cb) {
@@ -245,7 +245,7 @@ function forkAndFix(link, cb) {
     function (status, callback) {
       submitPullRequest(link, username, user, repo, status, callback);
     },// submit pull request
-    function (repo, status, callback) {
+    function (status, callback) {
       deleteRepo(repo, status, callback);
     },// delete forked repo if there is not a pull request to make
     function (status, callback) {
@@ -623,14 +623,14 @@ function deleteRepo(repo, status, cb) {
     client.del(endpoint, {},  function (err, status, body) {
       if (err) {
         app.log.error('Could not delete ' + endpoint.blue + ' : ' + body);
-        //return cb({message: err + ' ' + endpoint});
+        return cb({message: err + ' ' + endpoint});
       }
       if (status === 204) { //Status: 204 No Content
         app.log.info('Succesfully deleted ' + endpoint.blue);
         return cb(null, 'OK');
       } else {
         app.log.error('Could not delete ' + endpoint.blue + ' : ' + body);
-        return cb({message: endpoint + ' ' + body});
+        return cb(null, {message: endpoint + ' ' + body});
       }
     });
   } else {
