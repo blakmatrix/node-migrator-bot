@@ -21,7 +21,7 @@
   "directories"   : { "test": "./test"},
   "scripts": {
     "test": "vows --spec",
-    "start": "node app.js"
+    "start": "node server.js"
   },
   "name": "node-migrator-bot",
   "author": "Farrin A. Reid",

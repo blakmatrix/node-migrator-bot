@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 var flatiron = require('flatiron'),
     path     = require('path'),
     XRegExp  = require('xregexp').XRegExp,
