@@ -249,7 +249,6 @@ function forkAndFix(link, cb) {
       deleteRepoIfExists(repo, status, callback);
     }, // delete a repo if it already exists
     function (status, callback) { //We will now fork if there were changes
-      app.log.info('Forking ' + user.magenta.bold + '/' + repo.yellow.bold);
       forkRepo(link, forkedRepo, username, user, repo, repoLocation, status, callback);
     },//fork
     function (status, callback) {
@@ -307,6 +306,7 @@ function forkRepo(link, forkedRepo, username, user, repo, repoLocation, status, 
   if (status === 'DONE') {
     return cb(null, 'DONE');
   }
+  app.log.info('Forking ' + user.magenta.bold + '/' + repo.yellow.bold);
   var client   = github.client(github_token);
   github_token_ct -= 1;
   app.log.info('');
@@ -419,7 +419,8 @@ function cloneRepo(user, repo, link, forkedRepo, repoLocation, cb) {
   app.log.info("Attempting to clone " +  forkedRepo.blue.bold);
   //cmd = 'git clone git@github.com:' + username + '/' + repo + '.git "' + repoLocation + '"';
   //clone the users repo... fork later and add new origin
-  cmd = 'git clone git@github.com:' + user + '/' + repo + '.git "' + repoLocation + '"';
+  //cmd = 'git clone git@github.com:' + user + '/' + repo + '.git "' + repoLocation + '"';
+  cmd = 'git clone git@github.com:' + user + '/' + repo + '.git "' + repoLocation + '" --no-hardlinks --recursive';
   app.log.debug('calling: "' + cmd.grey + '"');
   child = exec(cmd,
     function (error, stdout, stderr) {
@@ -728,10 +729,16 @@ function isNotOK(element, index, array) {
   return (element !== 'OK');
 }
 
-function filterString(str) {
+function filterGoodString(str) {
   var re = /^(\w*((\.js)|(\.txt)|(\.md)|(\.markdown))?|readme.*)$/gi;
   // only choose folders and no ext files, *.js, *.txt, *.md, *.markdown, and readme files
   return XRegExp.test(str, re);
+}
+
+function filterBadString(str) {
+  var re = /^(node_modules|\.git|)$/gi;
+  // only choose folders and no ext files, *.js, *.txt, *.md, *.markdown, and readme files
+  return !(XRegExp.test(str, re));
 }
 
 function walk(dir, done) {
@@ -742,13 +749,15 @@ function walk(dir, done) {
       return done(null, []);//err);
     }
 
-    modList = list.filter(filterString);//filter out the undesirables
+    modList = list.filter(filterGoodString);//filter out the desirables
+    modList = modList.filter(filterBadString);//filter out the desirables
     list = modList;
+    app.log.info(list);
     pending = list.length;
     if (!pending) { return done(null, results); }
     list.forEach(function (file) {
       file = path.resolve(path.join(dir, file));
-      fs.stat(file, function (err, stat) {
+      fs.lstat(file, function (err, stat) {
         if (stat && stat.isDirectory()) {
           walk(file, function (err, res) {
             results = results.concat(res);
