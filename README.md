@@ -8,8 +8,8 @@ I will help you migrate your codebase to node v0.8!
 
 Did you know that the "sys" module throws an error if your program
 tries to require it in node v0.8? To help keep your code running, 
-I automatically replaced `var sys = require(\'sys\')` with 
-`var util = require(\'util\')`.  
+I automatically replaced `require(\'sys\')` with 
+`require(\'util\')`.  
 
 If you'd like to know more about these changes in node.js, take a look 
 at https://github.com/joyent/node/commit/1582cf#L1R51 and 
