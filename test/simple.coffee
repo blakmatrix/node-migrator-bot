@@ -5,7 +5,6 @@ sys = require('sys')
 sys = require "sys"
 
 util   =     require 'sys'
-util   =     require  's'+'y'+'s'
 
 var system = '2';
 var SySTEMBLARG = '2';
