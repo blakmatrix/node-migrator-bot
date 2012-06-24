@@ -865,7 +865,7 @@ function doFileUpdate(filename, cb) {
     }
 
 
-    var re = /require\s*\(\s*['"]?sys['"]?\s*\)/g,
+    var re = /require\s*\(?\s*['"]sys['"][ \t]{0,}\)?/g,
         replacement = "require('util')",
         dataStr = data.toString(),
         fixedDoc = '';
