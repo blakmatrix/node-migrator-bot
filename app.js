@@ -100,6 +100,11 @@ botOptions.dbAdd = function dbAdd(link, cb) {
   return null;
 };
 
+botOptions.dbAddComplete = function dbAdd(link, cb) {
+  redisClient.hset(npm_hash, link, 'completed');
+  return null;
+};
+
 botOptions.dbGetInfo = function dbGetInfo(cb) {
   redisClient.hgetall(npm_hash, function (err, data) {
     console.dir(data);
@@ -115,7 +120,7 @@ botOptions.dbCheck = function dbCheck(link, cb) {
     cb(null, hashk_value);
   });
 };
-
+botOptions.makePullRequest = false;
 // ============================================================================
 
 
