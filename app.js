@@ -17,8 +17,25 @@ var username = botOptions.username = app.config.get('username'),
     port     =                       app.config.get('database:port'),
     host     =                       app.config.get('database:host'),
     pass     =                       app.config.get('database:password'),
-    npm_hash = app.config.get('database:npm_hash');
+    npm_hash = app.config.get('database:npm_hash'),
+    totalNPMPackages       = null,
+    totalRepositories      = 0,
+    totalRepositoryMatches = 0,
+    repositoryMatchesList  = [];
 
+var redisClient = redis.createClient(port, host);
+
+redisClient.auth(pass, function (err) {
+  if (err) {
+    throw err;
+  }
+  app.log.info("REDIS Authed!");
+});
+
+redisClient.on("error", function (err) {
+  app.log.error("REDIS " + err.message);
+  //return process.exit(1);
+});
 
 // ========================================= Settings =========================
 var gitCommitMessage           = botOptions.gitCommitMessage           = '[fix] Changed require(\'sys\') to require(\'util\') for compatibility with node v0.8',
@@ -40,59 +57,25 @@ var gitCommitMessage           = botOptions.gitCommitMessage           = '[fix] 
     + '[' + botname + '](https://github.com/blakmatrix/node-migrator-bot)'
   ].join('\n');
 
-botOptions.makeFileChanges = function makeFileChanges(filename, cb) {
-  fs.readFile(filename, function (err, data) {
-    if (err) {
-      //return cb(err);
-      return cb(null, 'DONE');
-    }
+botOptions.makeFileChanges = function makeFileChanges(fileList, link, cb) {
 
+  if (fileList.some(function (ele) {return ele.indexOf('wscript') !== -1}) && fileList.some(function (ele) {return ele.indexOf('package.json') !== -1})) {
+    setTotalRepositoryMatches(link);
+    app.log.info('MATCH FOUND!'.green.bold.inverse + ' for ' + link.blue.bold);
+    return cb(null, 'OK');
+  } else {
+    return cb(null, 'DONE');
+  }
 
-    var re = /require\s*\(\s*['"]sys['"]\s*\)/g,
-        reFull = /sys\s*=\s*require\s*\(\s*['"]sys['"]\s*\)/g,
-        rePart = /sys\./g,
-        replacement = "require('util')",
-        replacementFull = "util = require('util')",
-        replacementPart = 'util.',
-        dataStr = data.toString(),
-        fixedDoc = '';
-
-    if (XRegExp.test(dataStr, re)) {
-      if (XRegExp.test(dataStr, reFull)) {
-        fixedDoc = XRegExp.replace(XRegExp.replace(dataStr, rePart, replacementPart, 'all'), reFull, replacementFull, 'all');
-      }
-      else {
-        fixedDoc = XRegExp.replace(dataStr, re, replacement, 'all');
-      }
-      // write changes out to file
-      fs.writeFile(filename, fixedDoc, function (err) {
-          if (err) {
-            app.log.error('The file was not saved');
-            //return cb(err);
-            return cb(null, 'DONE');
-          } else {
-            app.log.info(filename.yellow.bold + ' was modified and changed!'.inverse.green);
-            return cb(null, 'OK');
-          }
-        });
-
-    } else {
-      app.log.debug('No ' + 'require(\'sys\')'.magenta.bold + ' text found in ' + filename.yellow.bold);
-      return cb(null, 'DONE');
-    }
-  });
 };
 
-botOptions.includeFilter = function includeFilter(str) {
-  var re = /^(\w*((\.js)|(\.txt)|(\.md)|(\.markdown))?|readme.*)$/gi;
-  // only choose folders and no ext files, *.js, *.txt, *.md, *.markdown, and readme files
-  return XRegExp.test(str, re);
-};
+botOptions.filterList = function filterList(list, dir) {
+  var reInclude = /(^\w*|package\.json|\w*\.wscript|wscript)$/gi,
+      reExclude = /^(node_modules|\.git|)$/gi,
+      modList = list.filter(function (str) {return  XRegExp.test(str, reInclude); })
+                    .filter(function (str) {return !XRegExp.test(str, reExclude); });
 
-botOptions.excludeFilter = function excludeFilter(str) {
-  var re = /^(node_modules|\.git|)$/gi;
-  // only choose folders and no ext files, *.js, *.txt, *.md, *.markdown, and readme files
-  return !(XRegExp.test(str, re));
+  return modList;
 };
 
 botOptions.dbAdd = function dbAdd(link, cb) {
@@ -100,14 +83,41 @@ botOptions.dbAdd = function dbAdd(link, cb) {
   return null;
 };
 
-botOptions.dbAddComplete = function dbAdd(link, cb) {
+var dbAddComplete = botOptions.dbAddComplete = function (link, cb) {
   redisClient.hset(npm_hash, link, 'completed');
   return null;
 };
 
 botOptions.dbGetInfo = function dbGetInfo(cb) {
   redisClient.hgetall(npm_hash, function (err, data) {
-    console.dir(data);
+    app.log.info('status    repository');
+    app.log.info('--------- -------------------------------------------------------------');
+
+    for (var i in data) {
+      app.log.info(data[i] + ' ' + i);
+      ++totalRepositories;
+      if (data[i] === 'completed') {
+        ++totalRepositoryMatches;
+      }
+    }
+
+    return cb(null);
+  });
+};
+
+var dbGetCompleted = function (cb) {
+  redisClient.hgetall(npm_hash, function (err, data) {
+    app.log.info('');
+    app.log.info('List of matched repositories');
+    app.log.info('----------------------------------------------------------------------');
+
+    for (var i in data) {
+      if (data[i] === 'completed') {
+        app.log.info(i);
+        ++totalRepositoryMatches;
+      }
+      ++totalRepositories;
+    }
     return cb(null);
   });
 };
@@ -121,23 +131,43 @@ botOptions.dbCheck = function dbCheck(link, cb) {
   });
 };
 botOptions.makePullRequest = false;
+botOptions.forkRepo = false;
+botOptions.deleteRepo = false;
+
+botOptions.setTotalNPMPackages = function setTotalNPMPackages(result) {
+  totalNPMPackages = result.length;
+  return null;
+};
+
+botOptions.setTotalRepositories = function setTotalRepositories(result) {
+  totalRepositories = result.length;
+  return null;
+};
+
+function setTotalRepositoryMatches(link) {
+  totalRepositoryMatches++;
+  dbAddComplete(link);
+  repositoryMatchesList.push(link);
+  return null;
+}
+
+function displayStats() {
+  app.log.info('================================================================================');
+  app.log.info('================================================================================');
+  app.log.info('Stats:');
+  if (totalNPMPackages) {
+    app.log.info('NPM package totals:            ' + totalNPMPackages);
+  }
+  app.log.info('Github Repositories processed: ' + totalRepositories);
+  app.log.info('Github Repositories Matched:   ' + totalRepositoryMatches);
+  app.log.info('Github Repositories Affected:  ');
+  console.dir(repositoryMatchesList);
+  app.log.info('================================================================================');
+}
 // ============================================================================
 
 
 
-var redisClient = redis.createClient(port, host);
-
-redisClient.auth(pass, function (err) {
-  if (err) {
-    throw err;
-  }
-  app.log.info("REDIS Authed!");
-});
-
-redisClient.on("error", function (err) {
-  app.log.error("REDIS " + err.message);
-  //return process.exit(1);
-});
 
 
 
@@ -180,6 +210,11 @@ app.commands.db = function db(cb) {
   app.getDBinfo(cb);
 };
 
+app.commands.dbcompleted = function dbcompleted(cb) {
+  this.log.info('Getting completed items in DB...');
+  dbGetCompleted(cb);
+};
+
 app.commands.npm = function npm(link, cb) {
   this.log.warn('Running on all available npm repositories that are hosted on github!!!'.red.bold);
   app.doNPMUpdate(cb);
@@ -203,5 +238,7 @@ app.start(function (err) {
     return process.exit(1);
   }
   redisClient.quit();
+  //Stats
+  displayStats();
   app.log.info(botname.grey + ' ok'.green.bold);
 });

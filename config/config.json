@@ -1,12 +1,12 @@
 {
   "name": "node-migrator-bot",
   "username":"node-migrator-bot",
-  "password":"****",
+  "password":"XXXX",
   "bot-name": "migrationBot",
   "database": {
-    "port": 9241,
-    "host": "koi.redistogo.com",
-    "password": "****",
+    "port": 9041,
+    "host": "barreleye.redistogo.com",
+    "password": "XXXX",
     "npm_hash": "npm_june_2012"
   }
 }
