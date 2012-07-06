@@ -57,15 +57,35 @@ var gitCommitMessage           = botOptions.gitCommitMessage           = '[fix] 
     + '[' + botname + '](https://github.com/blakmatrix/node-migrator-bot)'
   ].join('\n');
 
+botOptions.changesList = [
+  {name: "DoStuff1",
+   message: '[fix] git commit message',
+   func: function (fileList, settings, cb) {
+    if (fileList.some(function (ele) {return ele.indexOf('wscript') !== -1}) && fileList.some(function (ele) {return ele.indexOf('package.json') !== -1})) {
+      setTotalRepositoryMatches(settings.link);
+      app.log.info('MATCH FOUND!'.green.bold.inverse + ' for ' + settings.link.blue.bold);
+      return cb(null, 'OK');
+    } else {
+      return cb(null, 'DONE');
+    }
+  }},
+  {name: "DoStuff2",
+   message: '[fix] git commit message',
+   func: function (fileList, settings, cb) {
+    app.log.info('Hello world 2');
+    return cb(null, 'OK');
+  }},
+  {name: "DoStuff3",
+   message: '[fix] git commit message',
+   func: function (fileList, settings, cb) {
+    app.log.info('Hello world 3');
+    return cb(null, 'OK');
+  }}
+];
+
 botOptions.makeFileChanges = function makeFileChanges(fileList, link, cb) {
 
-  if (fileList.some(function (ele) {return ele.indexOf('wscript') !== -1}) && fileList.some(function (ele) {return ele.indexOf('package.json') !== -1})) {
-    setTotalRepositoryMatches(link);
-    app.log.info('MATCH FOUND!'.green.bold.inverse + ' for ' + link.blue.bold);
-    return cb(null, 'OK');
-  } else {
-    return cb(null, 'DONE');
-  }
+  
 
 };
 
@@ -130,9 +150,12 @@ botOptions.dbCheck = function dbCheck(link, cb) {
     cb(null, hashk_value);
   });
 };
-botOptions.makePullRequest = false;
-botOptions.forkRepo = false;
-botOptions.deleteRepo = false;
+
+botOptions.makePullRequest    = false;
+botOptions.forkRepo           = false;
+botOptions.deleteRepo         = false;
+botOptions.addOnFailedCommit  = true;
+botOptions.addOnSuccessfulPR  = true;
 
 botOptions.setTotalNPMPackages = function setTotalNPMPackages(result) {
   totalNPMPackages = result.length;
