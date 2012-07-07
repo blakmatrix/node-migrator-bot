@@ -81,8 +81,8 @@ botOptions.changesList = [
         }
       });
     }},
-  {name: "path.existsSync",
-   message: '[fix] path.existsSync was moved to fs.existsSync',
+  {name: "fs.existsSync",
+   message: '[fix] fs.existsSync was moved to fs.existsSync',
    func: function (fileList, settings, cb) {
       async.map(fileList, function (file, callback) {
         var re = /path\.\bexistsSync\b/g;
