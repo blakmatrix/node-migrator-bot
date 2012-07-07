@@ -47,7 +47,7 @@ var gitPullRequestMessageTitle = botOptions.gitPullRequestMessageTitle = "Hi! I 
     'I am ' + botname,
     '',
     'Did you know that `path.{exists,existsSync}` was moved to `fs.{exists,existsSync}`, '
-    + ' and that `tty.setRawMode(mode)` was moved to `tty.ReadStream#setRawMode()` '
+    + ' and that `process.stdin.setRawMode(mode)` was moved to `tty.ReadStream#setRawMode()` '
     + '(i.e. `process.stdin.setRawMode()`) '
     + ' in node v0.8.0? Read more @[API changes between v0.6 and v0.8](https://github.com/joyent/node/wiki/API-changes-between-v0.6-and-v0.8) ',
     '',
@@ -100,8 +100,8 @@ botOptions.changesList = [
         }
       });
     }},
-  {name: "tty.setRawMode",
-   message: '[fix] tty.setRawMode(mode) was moved to tty.ReadStream#setRawMode() (i.e. process.stdin.setRawMode())',
+  {name: "process.stdin.setRawMode",
+   message: '[fix] process.stdin.setRawMode(mode) was moved to tty.ReadStream#setRawMode() (i.e. process.stdin.setRawMode())',
    func: function (fileList, settings, cb) {
       async.map(fileList, function (file, callback) {
         var re = /tty\.\bsetRawMode\b/g;
