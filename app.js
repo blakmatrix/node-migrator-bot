@@ -66,8 +66,8 @@ botOptions.changesList = [
    message: '[fix] path.exists was moved to fs.exists',
    func: function (fileList, settings, cb) {
       async.map(fileList, function (file, callback) {
-        var re = /path\.\bexists\b/g;
-        fileReplace(file, re, "fs.exists", callback);
+        var re = /([^[0-9a-zA-Z]])path(\s*.\s*exists\s*\()/g;
+        fileReplace(file, re, "$1fs$2", callback);
       }, function (err, results) {
         // results is now an array of stats for each file
         if (err) {
@@ -85,8 +85,8 @@ botOptions.changesList = [
    message: '[fix] path.existsSync was moved to fs.existsSync',
    func: function (fileList, settings, cb) {
       async.map(fileList, function (file, callback) {
-        var re = /path\.\bexistsSync\b/g;
-        fileReplace(file, re, "fs.existsSync", callback);
+        var re = /([^[0-9a-zA-Z]])path(\s*.\s*existsSync\s*\()/g;
+        fileReplace(file, re, "$1fs$2", callback);
       }, function (err, results) {
         // results is now an array of stats for each file
         if (err) {
@@ -104,8 +104,8 @@ botOptions.changesList = [
    message: '[fix] tty.setRawMode(mode) was moved to tty.ReadStream#setRawMode() (i.e. process.stdin.setRawMode())',
    func: function (fileList, settings, cb) {
       async.map(fileList, function (file, callback) {
-        var re = /tty\.\bsetRawMode\b/g;
-        fileReplace(file, re, "process.stdin.setRawMode", callback);
+        var re = /([^[0-9a-zA-Z]])tty(\s*.\s*setRawMode\s*\()/g;
+        fileReplace(file, re, "$1process.stdin$2", callback);
       }, function (err, results) {
         // results is now an array of stats for each file
         if (err) {
@@ -236,9 +236,9 @@ function fileReplace(filename, re, replacement, cb) {
       var dataStr = data.toString(),
           fixedDoc = '';
 
-      if (XRegExp.test(dataStr, re)) {
+      if (re.test(dataStr)) {
 
-        fixedDoc = XRegExp.replace(dataStr, re, replacement, 'all');
+        fixedDoc = dataStr.replace(re, replacement);
 
         // write changes out to file
         fs.writeFile(filename, fixedDoc, function (err) {
