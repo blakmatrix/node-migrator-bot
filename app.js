@@ -5,6 +5,7 @@ var flatiron   = require('flatiron'),
     fs         = require('fs'),
     path       = require('path'),
     redis      = require('redis'),
+    async      = require('async'),
     //broadway   = require('broadway'),
     app        = flatiron.app,
     botOptions = {};
@@ -38,59 +39,91 @@ redisClient.on("error", function (err) {
 });
 
 // ========================================= Settings =========================
-var gitCommitMessage           = botOptions.gitCommitMessage           = '[fix] Changed require(\'sys\') to require(\'util\') for compatibility with node v0.8',
-    gitPullRequestMessageTitle = botOptions.gitPullRequestMessageTitle = "Hi! I fixed some calls to \"sys\" for you!",
+var gitPullRequestMessageTitle = botOptions.gitPullRequestMessageTitle = "Hi! I fixed some code for you!",
     gitPullRequestMessage      = botOptions.gitPullRequestMessage      = [
-    'Hai!',
+    'Hi!',
     '',
     '',
     'I am ' + botname,
     '',
-    'Did you know that the "sys" module throws an error if your program '
-    + 'tries to require it in node v0.8? To help keep your code running, '
-    + 'I automatically replaced `var sys = require(\'sys\')` with '
-    + '`var util = require(\'util\')`.',
+    'Did you know that `path.{exists,existsSync}` was moved to `fs.{exists,existsSync}`, '
+    + ' and that `tty.setRawMode(mode)` was moved to `tty.ReadStream#setRawMode()` '
+    + '(i.e. `process.stdin.setRawMode()`) '
+    + ' in node v0.8.0? Read more @[API changes between v0.6 and v0.8](https://github.com/joyent/node/wiki/API-changes-between-v0.6-and-v0.8) ',
     '',
-    'Enjoy!',
+    'I automatically made some changes I think will help you migrate your codebase to '
+    + 'node v0.8.0, please review these changes and merge them if you feel they are '
+    + 'useful, If they are not you can ignore this Pull Request.',
+    '',
+    'Have a Nice Day!',
     '',
     '--'
     + '[' + botname + '](https://github.com/blakmatrix/node-migrator-bot)'
   ].join('\n');
 
 botOptions.changesList = [
-  {name: "DoStuff1",
-   message: '[fix] git commit message',
+  {name: "path.exists",
+   message: '[fix] path.exists was moved to fs.exists',
    func: function (fileList, settings, cb) {
-    if (fileList.some(function (ele) {return ele.indexOf('wscript') !== -1}) && fileList.some(function (ele) {return ele.indexOf('package.json') !== -1})) {
-      setTotalRepositoryMatches(settings.link);
-      app.log.info('MATCH FOUND!'.green.bold.inverse + ' for ' + settings.link.blue.bold);
-      return cb(null, 'OK');
-    } else {
-      return cb(null, 'DONE');
-    }
-  }},
-  {name: "DoStuff2",
-   message: '[fix] git commit message',
+      async.map(fileList, function (file, callback) {
+        var re = /path\.\bexists\b/g;
+        fileReplace(file, re, "fs.exists", callback);
+      }, function (err, results) {
+        // results is now an array of stats for each file
+        if (err) {
+          app.log.error("path.exists Error: " + err);
+          return cb(null, 'DONE');
+        }
+        if (results.indexOf('OK') === -1) {
+          return cb(null, 'DONE');
+        } else {
+          return cb(null, 'OK');
+        }
+      });
+    }},
+  {name: "path.existsSync",
+   message: '[fix] path.existsSync was moved to fs.existsSync',
    func: function (fileList, settings, cb) {
-    app.log.info('Hello world 2');
-    return cb(null, 'OK');
-  }},
-  {name: "DoStuff3",
-   message: '[fix] git commit message',
+      async.map(fileList, function (file, callback) {
+        var re = /path\.\bexistsSync\b/g;
+        fileReplace(file, re, "fs.existsSync", callback);
+      }, function (err, results) {
+        // results is now an array of stats for each file
+        if (err) {
+          app.log.error("path.exists Error: " + err);
+          return cb(null, 'DONE');
+        }
+        if (results.indexOf('OK') === -1) {
+          return cb(null, 'DONE');
+        } else {
+          return cb(null, 'OK');
+        }
+      });
+    }},
+  {name: "tty.setRawMode",
+   message: '[fix] tty.setRawMode(mode) was moved to tty.ReadStream#setRawMode() (i.e. process.stdin.setRawMode())',
    func: function (fileList, settings, cb) {
-    app.log.info('Hello world 3');
-    return cb(null, 'OK');
-  }}
+      async.map(fileList, function (file, callback) {
+        var re = /tty\.\bsetRawMode\b/g;
+        fileReplace(file, re, "process.stdin.setRawMode", callback);
+      }, function (err, results) {
+        // results is now an array of stats for each file
+        if (err) {
+          app.log.error("path.exists Error: " + err);
+          return cb(null, 'DONE');
+        }
+        if (results.indexOf('OK') === -1) {
+          return cb(null, 'DONE');
+        } else {
+          return cb(null, 'OK');
+        }
+      });
+    }}
 ];
 
-botOptions.makeFileChanges = function makeFileChanges(fileList, link, cb) {
-
-  
-
-};
 
 botOptions.filterList = function filterList(list, dir) {
-  var reInclude = /(^\w*|package\.json|\w*\.wscript|wscript)$/gi,
+  var reInclude = /^(\w*((\.js)|(\.txt)|(\.md)|(\.markdown))?|readme.*)$/gi,
       reExclude = /^(node_modules|\.git|)$/gi,
       modList = list.filter(function (str) {return  XRegExp.test(str, reInclude); })
                     .filter(function (str) {return !XRegExp.test(str, reExclude); });
@@ -98,15 +131,18 @@ botOptions.filterList = function filterList(list, dir) {
   return modList;
 };
 
-botOptions.dbAdd = function dbAdd(link, cb) {
+botOptions.dbAdd = function dbAdd(link, cb) {//no changes to make 
   redisClient.hset(npm_hash, link, 'processed');
   return null;
 };
 
-var dbAddComplete = botOptions.dbAddComplete = function (link, cb) {
+var dbAddComplete = botOptions.dbAddComplete = function (link, cb) {//successful PR
+  totalRepositoryMatches++;
   redisClient.hset(npm_hash, link, 'completed');
+  repositoryMatchesList.push(link);
   return null;
 };
+
 
 botOptions.dbGetInfo = function dbGetInfo(cb) {
   redisClient.hgetall(npm_hash, function (err, data) {
@@ -151,9 +187,9 @@ botOptions.dbCheck = function dbCheck(link, cb) {
   });
 };
 
-botOptions.makePullRequest    = false;
-botOptions.forkRepo           = false;
-botOptions.deleteRepo         = false;
+botOptions.makePullRequest    = true;
+botOptions.forkRepo           = true;
+botOptions.deleteRepo         = true;
 botOptions.addOnFailedCommit  = true;
 botOptions.addOnSuccessfulPR  = true;
 
@@ -186,6 +222,41 @@ function displayStats() {
   app.log.info('Github Repositories Affected:  ');
   console.dir(repositoryMatchesList);
   app.log.info('================================================================================');
+}
+
+
+function fileReplace(filename, re, replacement, cb) {
+  fs.readFile(filename, function (err, data) {
+      if (err) {
+        //return cb(err);
+        return cb(null, 'DONE');
+      }
+
+
+      var dataStr = data.toString(),
+          fixedDoc = '';
+
+      if (XRegExp.test(dataStr, re)) {
+
+        fixedDoc = XRegExp.replace(dataStr, re, replacement, 'all');
+
+        // write changes out to file
+        fs.writeFile(filename, fixedDoc, function (err) {
+            if (err) {
+              app.log.error('The file was not saved');
+              //return cb(err);
+              return cb(null, 'DONE');
+            } else {
+              app.log.info(filename.yellow.bold + ' was modified and changed!'.inverse.green);
+              return cb(null, 'OK');
+            }
+          });
+
+      } else {
+        app.log.debug('No ' + 'text to replace'.magenta.bold + ' found in ' + filename.yellow.bold);
+        return cb(null, 'DONE');
+      }
+    });
 }
 // ============================================================================
 

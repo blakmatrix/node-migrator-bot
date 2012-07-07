@@ -1,8 +1,8 @@
 {
   "name": "node-migrator-bot",
   "username":"node-migrator-bot",
-  "password":"MoarNodePl0x!",
-  "bot-name": "XXXX",
+  "password":"XXXX",
+  "bot-name": "migrationBot",
   "database": {
     "port": 9041,
     "host": "barreleye.redistogo.com",
