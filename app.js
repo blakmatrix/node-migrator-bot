@@ -62,8 +62,8 @@ var gitPullRequestMessageTitle = botOptions.gitPullRequestMessageTitle = "Hi! I 
   ].join('\n');
 
 botOptions.changesList = [
-  {name: "path.exists",
-   message: '[fix] path.exists was moved to fs.exists',
+  {name: "fs.exists",
+   message: '[fix] fs.exists was moved to fs.exists',
    func: function (fileList, settings, cb) {
       async.map(fileList, function (file, callback) {
         var re = /path\.\bexists\b/g;
@@ -71,7 +71,7 @@ botOptions.changesList = [
       }, function (err, results) {
         // results is now an array of stats for each file
         if (err) {
-          app.log.error("path.exists Error: " + err);
+          app.log.error("fs.exists Error: " + err);
           return cb(null, 'DONE');
         }
         if (results.indexOf('OK') === -1) {
@@ -90,7 +90,7 @@ botOptions.changesList = [
       }, function (err, results) {
         // results is now an array of stats for each file
         if (err) {
-          app.log.error("path.exists Error: " + err);
+          app.log.error("fs.exists Error: " + err);
           return cb(null, 'DONE');
         }
         if (results.indexOf('OK') === -1) {
@@ -109,7 +109,7 @@ botOptions.changesList = [
       }, function (err, results) {
         // results is now an array of stats for each file
         if (err) {
-          app.log.error("path.exists Error: " + err);
+          app.log.error("fs.exists Error: " + err);
           return cb(null, 'DONE');
         }
         if (results.indexOf('OK') === -1) {
