@@ -66,7 +66,7 @@ botOptions.changesList = [
    message: '[fix] path.exists was moved to fs.exists',
    func: function (fileList, settings, cb) {
       async.map(fileList, function (file, callback) {
-        var re = /([^[0-9a-zA-Z]])path(\s*.\s*exists\s*\()/g;
+        var re = /([^[0-9a-zA-Z_-]])path(\s*.\s*exists\s*[^[0-9a-zA-Z_-]])/g;
         fileReplace(file, re, "$1fs$2", callback);
       }, function (err, results) {
         // results is now an array of stats for each file
@@ -85,7 +85,7 @@ botOptions.changesList = [
    message: '[fix] path.existsSync was moved to fs.existsSync',
    func: function (fileList, settings, cb) {
       async.map(fileList, function (file, callback) {
-        var re = /([^[0-9a-zA-Z]])path(\s*.\s*existsSync\s*\()/g;
+        var re = /([^[0-9a-zA-Z_-]])path(\s*.\s*existsSync\s*[^[0-9a-zA-Z_-]])/g;
         fileReplace(file, re, "$1fs$2", callback);
       }, function (err, results) {
         // results is now an array of stats for each file
@@ -104,7 +104,7 @@ botOptions.changesList = [
    message: '[fix] tty.setRawMode(mode) was moved to tty.ReadStream#setRawMode() (i.e. process.stdin.setRawMode())',
    func: function (fileList, settings, cb) {
       async.map(fileList, function (file, callback) {
-        var re = /([^[0-9a-zA-Z]])tty(\s*.\s*setRawMode\s*\()/g;
+        var re = /([^[0-9a-zA-Z_-]])tty(\s*.\s*setRawMode\s*[^[0-9a-zA-Z_-]])/g;
         fileReplace(file, re, "$1process.stdin$2", callback);
       }, function (err, results) {
         // results is now an array of stats for each file
