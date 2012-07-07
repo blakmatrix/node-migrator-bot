@@ -47,7 +47,7 @@ var gitPullRequestMessageTitle = botOptions.gitPullRequestMessageTitle = "Hi! I 
     'I am ' + botname,
     '',
     'Did you know that `path.{exists,existsSync}` was moved to `fs.{exists,existsSync}`, '
-    + ' and that `tty.setRawMode(mode)` was moved to `tty.ReadStream#setRawMode()` '
+    + ' and that `process.stdin.setRawMode(mode)` was moved to `tty.ReadStream#setRawMode()` '
     + '(i.e. `process.stdin.setRawMode()`) '
     + ' in node v0.8.0? Read more @[API changes between v0.6 and v0.8](https://github.com/joyent/node/wiki/API-changes-between-v0.6-and-v0.8) ',
     '',
@@ -62,8 +62,8 @@ var gitPullRequestMessageTitle = botOptions.gitPullRequestMessageTitle = "Hi! I 
   ].join('\n');
 
 botOptions.changesList = [
-  {name: "path.exists",
-   message: '[fix] path.exists was moved to fs.exists',
+  {name: "fs.exists",
+   message: '[fix] fs.exists was moved to fs.exists',
    func: function (fileList, settings, cb) {
       async.map(fileList, function (file, callback) {
         var re = /path\.\bexists\b/g;
@@ -71,7 +71,7 @@ botOptions.changesList = [
       }, function (err, results) {
         // results is now an array of stats for each file
         if (err) {
-          app.log.error("path.exists Error: " + err);
+          app.log.error("fs.exists Error: " + err);
           return cb(null, 'DONE');
         }
         if (results.indexOf('OK') === -1) {
@@ -81,8 +81,8 @@ botOptions.changesList = [
         }
       });
     }},
-  {name: "path.existsSync",
-   message: '[fix] path.existsSync was moved to fs.existsSync',
+  {name: "fs.existsSync",
+   message: '[fix] fs.existsSync was moved to fs.existsSync',
    func: function (fileList, settings, cb) {
       async.map(fileList, function (file, callback) {
         var re = /path\.\bexistsSync\b/g;
@@ -90,7 +90,7 @@ botOptions.changesList = [
       }, function (err, results) {
         // results is now an array of stats for each file
         if (err) {
-          app.log.error("path.exists Error: " + err);
+          app.log.error("fs.exists Error: " + err);
           return cb(null, 'DONE');
         }
         if (results.indexOf('OK') === -1) {
@@ -100,8 +100,8 @@ botOptions.changesList = [
         }
       });
     }},
-  {name: "tty.setRawMode",
-   message: '[fix] tty.setRawMode(mode) was moved to tty.ReadStream#setRawMode() (i.e. process.stdin.setRawMode())',
+  {name: "process.stdin.setRawMode",
+   message: '[fix] process.stdin.setRawMode(mode) was moved to tty.ReadStream#setRawMode() (i.e. process.stdin.setRawMode())',
    func: function (fileList, settings, cb) {
       async.map(fileList, function (file, callback) {
         var re = /tty\.\bsetRawMode\b/g;
@@ -109,7 +109,7 @@ botOptions.changesList = [
       }, function (err, results) {
         // results is now an array of stats for each file
         if (err) {
-          app.log.error("path.exists Error: " + err);
+          app.log.error("fs.exists Error: " + err);
           return cb(null, 'DONE');
         }
         if (results.indexOf('OK') === -1) {
